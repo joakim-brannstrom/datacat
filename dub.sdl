@@ -13,7 +13,7 @@ configuration "executable" {
 }
 
 configuration "library" {
-    excludeSourceFile "source/app.d" "source/benchmark.d"
+    excludedSourceFiles "source/app.d" "source/benchmark.d"
 }
 
 configuration "unittest" {
