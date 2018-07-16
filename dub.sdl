@@ -1,0 +1,37 @@
+name "datacat"
+description "Lightweight Datalog engine intended to be embedded in other D programs"
+authors "Joakim Brännström"
+copyright "Copyright © 2018, Joakim Brännström"
+license "Apache-2.0"
+
+targetPath "build"
+
+configuration "executable" {
+    mainSourceFile "source/app.d"
+    excludedSourceFiles "source/datacat/benchmark.d"
+    dflags "-dip1000" "-dip1008"
+}
+
+configuration "library" {
+    excludeSourceFile "source/app.d" "source/benchmark.d"
+}
+
+configuration "unittest" {
+    dependency "unit-threaded" version="~>0.7.46"
+    mainSourceFile "bin/ut.d"
+    excludedSourceFiles "source/app.d"
+    targetType "executable"
+    preBuildCommands "dub run unit-threaded -c gen_ut_main -- -f bin/ut.d"
+}
+
+buildType "utCov" {
+    buildOptions "unittests" "debugMode" "debugInfo" "coverage"
+}
+
+buildType "utProf" {
+    buildOptions "unittests" "debugInfo" "profile" "optimize" "inline"
+}
+
+buildType "utProfGc" {
+    buildOptions "unittests" "debugInfo" "profileGC" "optimize" "inline"
+}
