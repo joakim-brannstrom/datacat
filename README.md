@@ -1,4 +1,4 @@
-# datacat
+# datacat [![Build Status](https://travis-ci.org/joakim-brannstrom/datacat.svg?branch=master)](https://travis-ci.org/joakim-brannstrom/datacat)
 
 **datacat** is a lightweight Datalog engine intended to be embedded in other D programs.
 
@@ -7,11 +7,6 @@
 datacat depends on the following software packages:
 
  * [D compiler](https://dlang.org/download.html) (dmd 2.079+, ldc 1.8.0+)
-
-For users running Ubuntu one of the dependencies can be installed with apt.
-```sh
-sudo apt install x
-```
 
 Download the D compiler of your choice, extract it and add to your PATH shell
 variable.
