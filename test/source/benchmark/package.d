@@ -4,17 +4,8 @@ License: $(LINK2 http://www.boost.org/LICENSE_1_0.txt, Boost Software License 1.
 Author: Joakim Brännström (joakim.brannstrom@gmx.com)
 
 This file contains benchmarks of the datacat implementation.
-
-To run a test in this module do:
----
-dub test -- -s -d datacat.benchmark.perf_join datacat.benchmark.perf_antijoin datacat.benchmark.perf_map
 */
-module datacat.benchmark;
-
-version (unittest) {
-} else {
-    static assert(0, "This file should only be part of the target `unittest`");
-}
+module benchmark;
 
 import core.time;
 import logger = std.experimental.logger;
@@ -54,7 +45,7 @@ BenchResult benchmark(alias fn)(int times) {
 }
 
 @("perf_join")
-@HiddenTest unittest {
+unittest {
     auto bench() {
         // arrange
         Iteration!(int, int) iter;
@@ -81,7 +72,7 @@ BenchResult benchmark(alias fn)(int times) {
 }
 
 @("perf_antijoin")
-@HiddenTest unittest {
+unittest {
     auto bench() {
         // arrange
         Iteration!(int, int) iter;
@@ -106,7 +97,7 @@ BenchResult benchmark(alias fn)(int times) {
 }
 
 @("perf_map")
-@HiddenTest unittest {
+unittest {
     auto bench() {
         // arrange
         Iteration!(int, int) iter;
