@@ -559,13 +559,16 @@ template Variable(KeyT, ValueT) {
 
 @("shall complete a variable")
 unittest {
+    // arrange
     auto a = new Variable!(int, int);
     a.insert(relation!(int, int).from([[1, 10], [5, 51]]));
     a.insert(relation!(int, int).from([[1, 10], [5, 52]]));
 
+    // act
     while (a.changed) {
     }
 
+    // assert
     a.complete.should == [kvTuple(1, 10), kvTuple(5, 51), kvTuple(5, 52)];
 }
 
