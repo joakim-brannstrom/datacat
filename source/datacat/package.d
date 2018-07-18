@@ -299,6 +299,8 @@ interface VariableTrait {
 /// variable on it.
 /// TODO: tuple should be constrainted to something with Key/Value.
 final class Variable(TupleT) : VariableTrait if (isTuple!TupleT) {
+    import std.range : isInputRange, ElementType;
+
     /// Convenient alias to retrieve the tuple type.
     alias TT = TupleT;
 
@@ -448,6 +450,19 @@ final class Variable(TupleT) : VariableTrait if (isTuple!TupleT) {
     void insert(Relation!TupleT relation) {
         if (!relation.empty) {
             toAdd ~= relation;
+        }
+    }
+
+    /// ditto
+    void insert(TupleT[] relation) {
+        if (relation.length != 0) {
+            toAdd ~= Relation!TupleT(relation);
+        }
+    }
+
+    void insert(T)(T relation) if (isInputRange!T && is(ElementType!T == TupleT)) {
+        if (relation.length != 0) {
+            toAdd ~= Relation!TupleT(relation);
         }
     }
 
@@ -622,9 +637,9 @@ unittest {
     // arrange
     Iteration iter;
     auto variable = iter.variable!(int, int)("source");
-    variable.insert(relation!(int, int).from(iota(3).map!(x => tuple(x, x + 1))));
+    variable.insert(iota(3).map!(x => kvTuple(x, x + 1)));
     // [[0,1],[1,2],[2,3],]
-    variable.insert(relation!(int, int).from(iota(3).map!(x => tuple(x + 1, x))));
+    variable.insert(iota(3).map!(x => kvTuple(x + 1, x)));
     // [[1,0],[2,1],[3,2],]
 
     // act
@@ -652,7 +667,7 @@ unittest {
     // arrange
     Iteration iter;
     auto variable = iter.variable!(int, int)("source");
-    variable.insert(relation!(int, int).from(iota(10).map!(x => kvTuple(x, x + 1))));
+    variable.insert(iota(10).map!(x => kvTuple(x, x + 1)));
     auto relation_ = relation!(int).from(iota(10).filter!(x => x % 3 == 0)
             .map!kvTuple);
 
@@ -682,7 +697,7 @@ unittest {
     // arrange
     Iteration iter;
     auto variable = iter.variable!(int, int)("source");
-    variable.insert(relation!(int, int).from(iota(10).map!(x => kvTuple(x, x))));
+    variable.insert(iota(10).map!(x => kvTuple(x, x)));
 
     // act
     while (iter.changed) {
@@ -710,8 +725,8 @@ unittest {
     // arrange
     Iteration iter;
     auto variable = iter.variable!(int, int)("source");
-    variable.insert(relation!(int, int).from(iota(10).map!(x => tuple(x, x + 1))));
-    variable.insert(relation!(int, int).from(iota(10).map!(x => tuple(x + 1, x))));
+    variable.insert(iota(10).map!(x => kvTuple(x, x + 1)));
+    variable.insert(iota(10).map!(x => kvTuple(x + 1, x)));
 
     // act
     while (iter.changed) {
@@ -737,8 +752,8 @@ unittest {
     fast.forceFastPath = true;
     auto slow = iter.variable!(int, int)("slow");
     foreach (a; [fast, slow]) {
-        a.insert(relation!(int, int).from(iota(10).map!(x => tuple(x, x + 1))));
-        a.insert(relation!(int, int).from(iota(10).map!(x => tuple(x + 1, x))));
+        a.insert(iota(10).map!(x => kvTuple(x, x + 1)));
+        a.insert(iota(10).map!(x => kvTuple(x + 1, x)));
     }
 
     // act
