@@ -12,7 +12,7 @@ module datacat.map;
 import datacat : Variable, Relation;
 
 // TODO: add constraint on Fn that the param is T1 returning T2.
-void mapInto(alias logicFn, InputT, OutputT)(InputT input, ref OutputT output) {
+void mapInto(alias logicFn, InputT, OutputT)(InputT input, OutputT output) {
     import std.array : appender;
 
     auto results = appender!(OutputT.TT[])();

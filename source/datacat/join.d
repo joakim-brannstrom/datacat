@@ -22,8 +22,7 @@ import datacat : Variable, Relation, hasKeyField, hasValueField,
  * Params:
  *  output = the result of the cross product between input1 and input2 by applying logicFn
  */
-void join(alias logicFn, Input1T, Input2T, OutputT)(Input1T input1, Input2T input2,
-        ref OutputT output) {
+void join(alias logicFn, Input1T, Input2T, OutputT)(Input1T input1, Input2T input2, OutputT output) {
     import std.array : appender;
 
     auto results = appender!(Input1T.TT[]);
@@ -45,7 +44,7 @@ void join(alias logicFn, Input1T, Input2T, OutputT)(Input1T input1, Input2T inpu
 
 /// Moves all recent tuples from `input1` that are not present in `input2` into `output`.
 void antiJoin(alias logicFn, Input1T, Input2T, OutputT)(Input1T input1,
-        Input2T input2, ref OutputT output) {
+        Input2T input2, OutputT output) {
     import std.array : appender, empty;
 
     auto results = appender!(Input1T.TT[]);

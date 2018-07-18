@@ -41,7 +41,6 @@ version (unittest) import unit_threaded;
 /// Convenient function for creating a key/value tuple.
 auto kvTuple(K, V)(auto ref K k, auto ref V v) {
     import std.typecons : tuple;
-    import std.typecons : Tuple;
 
     return tuple!("key", "value")(k, v);
 }
@@ -224,17 +223,15 @@ unittest {
 
 /// A type that can report on whether it has changed.
 /// changed = Reports whether the variable has changed since it was last asked.
-package enum isVariable(T) = hasMember!(T, "changed") && is(ReturnType!(T.changed) == bool);
+package enum isVariable(T) = is(T : VariableTrait);
 
 /// An iterative context for recursive evaluation.
 ///
 /// An `Iteration` tracks monotonic variables, and monitors their progress.
 /// It can inform the user if they have ceased changing, at which point the
 /// computation should be done.
-struct Iteration(VariableT) if (isVariable!VariableT) {
-    alias VT = VariableT;
-
-    VariableT*[] variables;
+struct Iteration {
+    VariableTrait[] variables;
 
     /// Reports whether any of the monitored variables have changed since
     /// the most recent call.
@@ -250,8 +247,10 @@ struct Iteration(VariableT) if (isVariable!VariableT) {
     }
 
     /// Creates a new named variable associated with the iterative context.
-    scope VariableT* variable(string s) {
-        auto v = new VariableT(s);
+    scope auto variable(T0, T1)(string s) {
+        import std.typecons : Tuple;
+
+        auto v = new Variable!(Tuple!(T0, "key", T1, "value"))(s);
         variables ~= v;
         return v;
     }
@@ -260,10 +259,9 @@ struct Iteration(VariableT) if (isVariable!VariableT) {
     ///
     /// This variable will not be maintained distinctly, and may advertise tuples as
     /// recent multiple times (perhaps unbounded many times).
-    scope VariableT* variableInDistinct(string s) {
-        auto v = new VariableT(s);
+    scope auto variableInDistinct(T0, T1)(string s) {
+        auto v = this.variable!(T0, T1)(s);
         v.distinct = false;
-        variables ~= v;
         return v;
     }
 
@@ -273,15 +271,14 @@ struct Iteration(VariableT) if (isVariable!VariableT) {
     }
 }
 
-/// Make an Iterator with variables holding tuples of the two template parameters.
-template Iteration(KeyT, ValueT) {
-    import std.typecons : Tuple;
-
-    alias Iteration = Iteration!(Variable!(Tuple!(KeyT, "key", ValueT, "value")));
-}
-
 /// A type that has a key and value member.
 enum isTuple(T) = hasMember!(T, "key") && hasMember!(T, "value");
+
+/// A type that can report on whether it has changed.
+interface VariableTrait {
+    /// Reports whether the variable has changed since it was last asked.
+    bool changed();
+}
 
 /// An monotonically increasing set of `Tuple`s.
 ///
@@ -301,7 +298,7 @@ enum isTuple(T) = hasMember!(T, "key") && hasMember!(T, "value");
 /// and it is important that any cycle of derivations have at least one de-duplicating
 /// variable on it.
 /// TODO: tuple should be constrainted to something with Key/Value.
-struct Variable(TupleT) if (isTuple!TupleT) {
+final class Variable(TupleT) : VariableTrait if (isTuple!TupleT) {
     /// Convenient alias to retrieve the tuple type.
     alias TT = TupleT;
 
@@ -327,12 +324,15 @@ struct Variable(TupleT) if (isTuple!TupleT) {
     /// A list of future tuples, to be introduced.
     Relation!TupleT[] toAdd;
 
+    this() {
+    }
+
     this(string name) {
         this.name = name;
     }
 
     // generic opCmp
-    int opCmp(ref const This rhs) {
+    int opCmp(const ref This rhs) const {
         import std.meta : AliasSeq;
 
         int res;
@@ -470,7 +470,7 @@ struct Variable(TupleT) if (isTuple!TupleT) {
         return result;
     }
 
-    bool changed() {
+    override bool changed() {
         import std.array : popBack, back, appender;
 
         // 1. Merge self.recent into self.stable.
@@ -560,7 +560,8 @@ template Variable(KeyT, ValueT) {
 
 @("shall be comparable")
 unittest {
-    Variable!(int, int) a, b;
+    auto a = new Variable!(int, int);
+    auto b = new typeof(a);
     (a < b).shouldBeFalse;
 
     b.insert(relation!(int, int).from([[1, 1]]));
@@ -569,7 +570,7 @@ unittest {
 
 @("shall complete a variable")
 unittest {
-    Variable!(int, int) a;
+    auto a = new Variable!(int, int);
     a.insert(relation!(int, int).from([[1, 10], [5, 51]]));
     a.insert(relation!(int, int).from([[1, 10], [5, 52]]));
 
@@ -582,7 +583,7 @@ unittest {
 @("shall progress a variable by moving newly added to the recent state")
 unittest {
     // arrange
-    Variable!(int, int) a;
+    auto a = new Variable!(int, int);
     a.insert(relation!(int, int).from([[1, 10], [2, 20], [5, 50]]));
     a.toAdd.empty.should == false;
     a.recent.empty.should == true;
@@ -600,7 +601,7 @@ unittest {
 @("shall progress from toAdd to stable after two `changed`")
 unittest {
     // arrange
-    Variable!(int, int) a;
+    auto a = new Variable!(int, int);
     a.insert(relation!(int, int).from([[1, 10], [2, 20], [5, 50]]));
 
     // act
@@ -619,8 +620,8 @@ unittest {
     import std.range : iota;
 
     // arrange
-    Iteration!(int, int) iter;
-    auto variable = iter.variable("source");
+    Iteration iter;
+    auto variable = iter.variable!(int, int)("source");
     variable.insert(relation!(int, int).from(iota(3).map!(x => tuple(x, x + 1))));
     // [[0,1],[1,2],[2,3],]
     variable.insert(relation!(int, int).from(iota(3).map!(x => tuple(x + 1, x))));
@@ -649,10 +650,11 @@ unittest {
     import std.range : iota;
 
     // arrange
-    Iteration!(int, int) iter;
-    auto variable = iter.variable("source");
+    Iteration iter;
+    auto variable = iter.variable!(int, int)("source");
     variable.insert(relation!(int, int).from(iota(10).map!(x => kvTuple(x, x + 1))));
-    auto relation_ = relation!(int).from(iota(10).filter!(x => x % 3 == 0).map!kvTuple);
+    auto relation_ = relation!(int).from(iota(10).filter!(x => x % 3 == 0)
+            .map!kvTuple);
 
     // act
     while (iter.changed) {
@@ -678,8 +680,8 @@ unittest {
     import std.range : iota;
 
     // arrange
-    Iteration!(int, int) iter;
-    auto variable = iter.variable("source");
+    Iteration iter;
+    auto variable = iter.variable!(int, int)("source");
     variable.insert(relation!(int, int).from(iota(10).map!(x => kvTuple(x, x))));
 
     // act
@@ -706,8 +708,8 @@ unittest {
     import std.range : iota;
 
     // arrange
-    Iteration!(int, int) iter;
-    auto variable = iter.variable("source");
+    Iteration iter;
+    auto variable = iter.variable!(int, int)("source");
     variable.insert(relation!(int, int).from(iota(10).map!(x => tuple(x, x + 1))));
     variable.insert(relation!(int, int).from(iota(10).map!(x => tuple(x + 1, x))));
 
@@ -730,10 +732,10 @@ unittest {
     import std.range : iota;
 
     // arrange
-    Iteration!(int, int) iter;
-    auto fast = iter.variable("fast");
+    Iteration iter;
+    auto fast = iter.variable!(int, int)("fast");
     fast.forceFastPath = true;
-    auto slow = iter.variable("slow");
+    auto slow = iter.variable!(int, int)("slow");
     foreach (a; [fast, slow]) {
         a.insert(relation!(int, int).from(iota(10).map!(x => tuple(x, x + 1))));
         a.insert(relation!(int, int).from(iota(10).map!(x => tuple(x + 1, x))));
