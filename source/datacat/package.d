@@ -333,21 +333,6 @@ final class Variable(TupleT) : VariableTrait if (isTuple!TupleT) {
         this.name = name;
     }
 
-    // generic opCmp
-    int opCmp(const ref This rhs) const {
-        import std.meta : AliasSeq;
-
-        int res;
-        static foreach (m; AliasSeq!("distinct", "name", "stable", "recent", "toAdd")) {
-            res = __traits(getMember, this, m) < __traits(getMember, rhs, m) ? -1
-                : (__traits(getMember, this, m) > __traits(getMember, rhs, m) ? 1 : 0);
-            if (res)
-                return res;
-        }
-
-        return 0;
-    }
-
     /// Adds tuples that result from joining `input1` and `input2`.
     ///
     /// # Examples
@@ -570,16 +555,6 @@ template Variable(KeyT, ValueT) {
     import std.typecons : Tuple;
 
     alias Variable = Variable!(Tuple!(KeyT, "key", ValueT, "value"));
-}
-
-@("shall be comparable")
-unittest {
-    auto a = new Variable!(int, int);
-    auto b = new typeof(a);
-    (a < b).shouldBeFalse;
-
-    b.insert(relation!(int, int).from([[1, 1]]));
-    (a < b).shouldBeTrue;
 }
 
 @("shall complete a variable")
