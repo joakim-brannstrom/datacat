@@ -299,7 +299,7 @@ interface VariableTrait {
 /// variable on it.
 /// TODO: tuple should be constrainted to something with Key/Value.
 final class Variable(TupleT) : VariableTrait if (isTuple!TupleT) {
-    import std.range : isInputRange, ElementType;
+    import std.range : isInputRange, ElementType, isOutputRange;
 
     /// Convenient alias to retrieve the tuple type.
     alias TT = TupleT;
@@ -460,6 +460,7 @@ final class Variable(TupleT) : VariableTrait if (isTuple!TupleT) {
         }
     }
 
+    /// ditto
     void insert(T)(T relation) if (isInputRange!T && is(ElementType!T == TupleT)) {
         if (relation.length != 0) {
             toAdd ~= Relation!TupleT(relation);
@@ -554,8 +555,6 @@ final class Variable(TupleT) : VariableTrait if (isTuple!TupleT) {
 
         return !recent.empty;
     }
-
-    import std.range : isOutputRange;
 
     void toString(Writer)(ref Writer w) if (isOutputRange!(Writer, char)) {
         import std.format : formattedWrite;
