@@ -41,12 +41,13 @@ int main(string[] args) {
         writeln("* Processing ", fname);
 
         auto rows = readText(fname).csvReader!Row(["lowest(usec)", "total(usec)"]).array;
+        const int lowest = rows.map!"a.lowest".minElement;
 
         {
             GGPlotD gg;
             gg = xaxisLabel(fname ~ " abs").putIn(gg);
             const double yscale = () {
-                if (rows.map!"a.lowest".minElement > 1000) {
+                if (lowest > 1000) {
                     gg = yaxisLabel("ms").putIn(gg);
                     return 1000.0;
                 }
@@ -65,7 +66,6 @@ int main(string[] args) {
             GGPlotD gg;
             gg = xaxisLabel(fname ~ " floor").putIn(gg);
 
-            const int lowest = rows.map!"a.lowest".minElement;
             const double yscale = () {
                 if ((rows.map!"a.lowest".maxElement - lowest) > 1000) {
                     gg = yaxisLabel("ms").putIn(gg);
