@@ -35,32 +35,55 @@ int main(string[] args) {
         return 1;
     }
 
-    Facets facets;
+    Facets fc;
 
     foreach (fname; data_files) {
         writeln("* Processing ", fname);
 
         auto rows = readText(fname).csvReader!Row(["lowest(usec)", "total(usec)"]).array;
 
-        GGPlotD gg;
-        gg = xaxisLabel(fname).putIn(gg);
-        const double yscale = () {
-            if (rows.map!"a.lowest".minElement > 1000) {
-                gg = yaxisLabel("ms").putIn(gg);
-                return 1000.0;
-            }
-            gg = yaxisLabel("μs").putIn(gg);
-            return 1.0;
-        }();
+        {
+            GGPlotD gg;
+            gg = xaxisLabel(fname ~ " abs").putIn(gg);
+            const double yscale = () {
+                if (rows.map!"a.lowest".minElement > 1000) {
+                    gg = yaxisLabel("ms").putIn(gg);
+                    return 1000.0;
+                }
+                gg = yaxisLabel("μs").putIn(gg);
+                return 1.0;
+            }();
 
-        gg = rows.enumerate.map!(a => aes!("x", "y")(a.index,
-                a.value.lowest / yscale)).array.geomPoint.putIn(gg);
-        gg = rows.enumerate.map!(a => aes!("x", "y")(a.index,
-                a.value.lowest / yscale)).array.geomLine.putIn(gg);
-        facets = gg.putIn(facets);
+            gg = rows.enumerate.map!(a => aes!("x", "y")(a.index,
+                    a.value.lowest / yscale)).array.geomPoint.putIn(gg);
+            gg = rows.enumerate.map!(a => aes!("x", "y")(a.index,
+                    a.value.lowest / yscale)).array.geomLine.putIn(gg);
+            fc = gg.putIn(fc);
+        }
+
+        { // floor set to the lowest recorded value
+            GGPlotD gg;
+            gg = xaxisLabel(fname ~ " floor").putIn(gg);
+
+            const int lowest = rows.map!"a.lowest".minElement;
+            const double yscale = () {
+                if ((rows.map!"a.lowest".maxElement - lowest) > 1000) {
+                    gg = yaxisLabel("ms").putIn(gg);
+                    return 1000.0;
+                }
+                gg = yaxisLabel("μs").putIn(gg);
+                return 1.0;
+            }();
+
+            gg = rows.enumerate.map!(a => aes!("x", "y")(a.index,
+                    (a.value.lowest - lowest) / yscale)).array.geomPoint.putIn(gg);
+            gg = rows.enumerate.map!(a => aes!("x", "y")(a.index,
+                    (a.value.lowest - lowest) / yscale)).array.geomLine.putIn(gg);
+            fc = gg.putIn(fc);
+        }
     }
 
-    facets.save("profile_graph.png", 800, 800);
+    fc.save("profile_graph.png", 800, 800);
 
     return 0;
 }
