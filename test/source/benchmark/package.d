@@ -16,22 +16,45 @@ import unit_threaded;
 
 import datacat;
 
+immutable ResultFileExt = ".dat";
+
 struct BenchResult {
+    string name;
     Duration total;
     Duration lowest = Duration.max;
+
+    this(string name) {
+        this.name = name;
+    }
+
+    ~this() {
+        import std.file : exists;
+        import std.stdio : File;
+
+        auto fname = name ~ ResultFileExt;
+
+        try {
+            if (!exists(fname))
+                File(fname, "w").writeln(`"lowest(usec)","total(usec)"`);
+            File(fname, "a").writefln(`"%s","%s"`, lowest.total!"usecs", total.total!"usecs");
+        } catch (Exception e) {
+            logger.error(e.msg);
+        }
+    }
+
     string toString() {
         import std.format : format;
 
-        return format("Benchmark: total:(%s) lowest:(%s)", total, lowest);
+        return format(`lowest(%s) total(%s)`, lowest, total);
     }
 }
 
-BenchResult benchmark(alias fn)(int times) {
+auto benchmark(alias fn)(int times, string func = __FUNCTION__) {
     import std.datetime.stopwatch : StopWatch;
-    import std.typecons : Yes;
+    import std.typecons : Yes, RefCounted;
     import std.stdio;
 
-    BenchResult res;
+    auto res = RefCounted!BenchResult(func);
     foreach (const i; 0 .. times) {
         auto sw = StopWatch(Yes.autoStart);
         auto fnres = fn();
@@ -48,8 +71,8 @@ BenchResult benchmark(alias fn)(int times) {
 unittest {
     auto bench() {
         // arrange
-        Iteration!(int, int) iter;
-        auto variable = iter.variable("source");
+        Iteration iter;
+        auto variable = iter.variable!(int, int)("source");
         variable.insert(relation!(int, int).from(iota(100).map!(x => tuple(x, x + 1))));
         // [[0,1],[1,2],[2,3],]
         variable.insert(relation!(int, int).from(iota(100).map!(x => tuple(x + 1, x))));
@@ -75,10 +98,11 @@ unittest {
 unittest {
     auto bench() {
         // arrange
-        Iteration!(int, int) iter;
-        auto variable = iter.variable("source");
+        Iteration iter;
+        auto variable = iter.variable!(int, int)("source");
         variable.insert(relation!(int, int).from(iota(100).map!(x => kvTuple(x, x + 1))));
-        auto relation_ = relation!(int).from(iota(100).filter!(x => x % 3 == 0).map!kvTuple);
+        auto relation_ = relation!(int).from(iota(100).filter!(x => x % 3 == 0)
+                .map!kvTuple);
 
         // act
         while (iter.changed) {
@@ -100,8 +124,8 @@ unittest {
 unittest {
     auto bench() {
         // arrange
-        Iteration!(int, int) iter;
-        auto variable = iter.variable("source");
+        Iteration iter;
+        auto variable = iter.variable!(int, int)("source");
         variable.insert(relation!(int, int).from(iota(100).map!(x => kvTuple(x, x))));
 
         // act
