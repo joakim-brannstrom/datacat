@@ -544,6 +544,11 @@ final class Variable(TupleT) : VariableTrait if (isTuple!TupleT) {
         return !recent.empty;
     }
 
+    /// Returns: total elements in stable.
+    size_t countStable() {
+        return stable.map!"a.length".sum;
+    }
+
     void toString(Writer)(ref Writer w) if (isOutputRange!(Writer, char)) {
         import std.format : formattedWrite;
 
@@ -758,4 +763,13 @@ unittest {
 
     // assert
     fast.complete.should == slow.complete;
+}
+
+@("shall count the elements in the nested arrays in stable")
+unittest {
+    auto var = new Variable!(int, int);
+    var.stable ~= relation!(int, int)([kvTuple(3, 2), kvTuple(4, 2)]);
+    var.stable ~= relation!(int, int)([kvTuple(3, 2), kvTuple(4, 2)]);
+
+    var.countStable.should == 4;
 }
