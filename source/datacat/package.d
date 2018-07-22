@@ -554,10 +554,20 @@ final class Variable(TupleT) : VariableTrait if (isTuple!TupleT) {
     }
 }
 
-template Variable(KeyT, ValueT) {
+/// Create a Variable type with a tuple of the provided types (`Args`).
+template Variable(Args...) {
     import std.typecons : Tuple;
+    import std.variant : Variant;
 
-    alias Variable = Variable!(Tuple!(KeyT, "key", ValueT, "value"));
+    static if (Args.length == 1) {
+        alias Variable = Variable!(Tuple!(Args[0], "key"));
+    } else static if (Args.length == 2) {
+        alias Variable = Variable!(Tuple!(Args[0], "key", Args[1], "value"));
+    } else {
+        import std.conv : to;
+
+        static assert(0, "1 or 2 parameters required. " ~ Args.length.to!string ~ " provided");
+    }
 }
 
 @("shall complete a variable")
