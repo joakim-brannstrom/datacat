@@ -1,0 +1,21 @@
+name "datacat_test_standalone"
+description "Standalone applications for testing datacat"
+authors "Joakim Brännström"
+copyright "Copyright © 2018, Joakim Brännström"
+license "BSL-1.0"
+
+targetPath "build"
+
+dependency "datacat_test_standalone:datacat" version="*"
+subPackage "../.."
+subConfiguration "datacat_test_standalone:datacat" "library"
+
+dependency "datacat_test_standalone:common" version="*"
+subPackage "../common"
+
+configuration "graspan1" {
+    targetName "graspan1"
+    targetType "executable"
+    sourcePaths "source/graspan1"
+    importPaths "source/graspan1"
+}
