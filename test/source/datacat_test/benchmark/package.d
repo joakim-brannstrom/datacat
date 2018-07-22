@@ -12,13 +12,10 @@ import logger = std.experimental.logger;
 import std.algorithm : map, filter;
 import std.range : iota;
 
-import unit_threaded;
-
 import datacat;
 import datacat_test.common;
 
-@("perf_join")
-unittest {
+void perf_join() {
     auto bench() {
         // arrange
         Iteration iter;
@@ -40,12 +37,11 @@ unittest {
         return variable.complete;
     }
 
-    auto r = benchmark!(bench)(10);
+    auto r = benchmark!(bench)(1);
     logger.infof("%s %s: %s", __FUNCTION__, __LINE__, r);
 }
 
-@("perf_antijoin")
-unittest {
+void perf_antijoin() {
     auto bench() {
         // arrange
         Iteration iter;
@@ -66,12 +62,11 @@ unittest {
         return variable.complete;
     }
 
-    auto r = benchmark!(bench)(1000);
+    auto r = benchmark!(bench)(10);
     logger.infof("%s %s: %s", __FUNCTION__, __LINE__, r);
 }
 
-@("perf_map")
-unittest {
+void perf_map() {
     auto bench() {
         // arrange
         Iteration iter;
@@ -93,6 +88,6 @@ unittest {
         return variable.complete;
     }
 
-    auto r = benchmark!(bench)(100);
+    auto r = benchmark!(bench)(10);
     logger.infof("%s %s: %s", __FUNCTION__, __LINE__, r);
 }

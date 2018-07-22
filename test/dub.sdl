@@ -1,12 +1,10 @@
 name "datacat_test"
-description "Test of datacat"
+description "Benchmark suite for datacat"
 authors "Joakim Brännström"
 copyright "Copyright © 2018, Joakim Brännström"
-license "Apache-2.0"
+license "BSL-1.0"
 
 targetPath "build"
-
-dependency "unit-threaded" version="~>0.7.46"
 
 dependency "datacat_test:datacat" version="*"
 subPackage "../"
@@ -15,20 +13,19 @@ subConfiguration "datacat_test:datacat" "library"
 dependency "datacat_test:common" version="*"
 subPackage "common/"
 
-configuration "unittest" {
+configuration "application" {
+    targetName "datacat_benchmark"
     targetType "executable"
-    mainSourceFile "build/ut.d"
-    preBuildCommands "dub run unit-threaded -c gen_ut_main -- -f build/ut.d"
 }
 
 buildType "utCov" {
-    buildOptions "unittests" "debugMode" "debugInfo" "coverage"
+    buildOptions "debugMode" "debugInfo" "coverage"
 }
 
 buildType "utProf" {
-    buildOptions "unittests" "debugInfo" "profile" "optimize" "inline"
+    buildOptions "debugInfo" "profile" "optimize" "inline" "releaseMode"
 }
 
 buildType "utProfGc" {
-    buildOptions "unittests" "debugInfo" "profileGC" "optimize" "inline"
+    buildOptions "debugInfo" "profileGC" "optimize" "inline"
 }
