@@ -1,4 +1,3 @@
-perf.txt
-*.dat
+*.csv
 *.png
 make_graph_from_benchmark

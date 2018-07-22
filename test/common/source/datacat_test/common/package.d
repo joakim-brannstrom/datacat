@@ -8,7 +8,7 @@ module datacat_test.common;
 import core.time : Duration;
 import logger = std.experimental.logger;
 
-immutable ResultFileExt = ".dat";
+immutable ResultFileExt = ".csv";
 
 struct BenchResult {
     string name;
