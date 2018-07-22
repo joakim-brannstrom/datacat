@@ -12,6 +12,9 @@ dependency "datacat_test:datacat" version="*"
 subPackage "../"
 subConfiguration "datacat_test:datacat" "library"
 
+dependency "datacat_test:common" version="*"
+subPackage "common/"
+
 configuration "unittest" {
     targetType "executable"
     mainSourceFile "build/ut.d"
