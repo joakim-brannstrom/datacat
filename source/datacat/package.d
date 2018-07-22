@@ -18,6 +18,7 @@ vectors again.
 */
 module datacat;
 
+import logger = std.experimental.logger;
 import std.algorithm;
 import std.array;
 import std.ascii;
@@ -28,8 +29,8 @@ import std.process;
 import std.range;
 import std.stdio;
 import std.string;
-import logger = std.experimental.logger;
 import std.traits;
+import std.typecons : Tuple;
 
 public import std.typecons : tuple;
 
@@ -37,6 +38,8 @@ public import datacat.join;
 public import datacat.range;
 
 version (unittest) import unit_threaded;
+
+alias KVTuple(T, V) = Tuple!(T, "key", V, "value");
 
 /// Convenient function for creating a key/value tuple.
 auto kvTuple(K, V)(auto ref K k, auto ref V v) {
