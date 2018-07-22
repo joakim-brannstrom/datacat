@@ -6,7 +6,7 @@ dub build
 
 pushd test
 # checking that the perf suite can build
-dub build -c unittest -b unittest
+dub build -b release
 
 pushd standalone
 # test building the standalone apps
