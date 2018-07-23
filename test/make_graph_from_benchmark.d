@@ -16,7 +16,7 @@ import std.range;
 import std.stdio;
 import std.string;
 
-immutable ResultFileExt = ".dat";
+immutable ResultFileExt = ".csv";
 
 struct Row {
     int lowest;

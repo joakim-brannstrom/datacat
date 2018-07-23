@@ -18,6 +18,7 @@ vectors again.
 */
 module datacat;
 
+import logger = std.experimental.logger;
 import std.algorithm;
 import std.array;
 import std.ascii;
@@ -28,8 +29,8 @@ import std.process;
 import std.range;
 import std.stdio;
 import std.string;
-import logger = std.experimental.logger;
 import std.traits;
+import std.typecons : Tuple;
 
 public import std.typecons : tuple;
 
@@ -37,6 +38,8 @@ public import datacat.join;
 public import datacat.range;
 
 version (unittest) import unit_threaded;
+
+alias KVTuple(T, V) = Tuple!(T, "key", V, "value");
 
 /// Convenient function for creating a key/value tuple.
 auto kvTuple(K, V)(auto ref K k, auto ref V v) {
@@ -541,6 +544,11 @@ final class Variable(TupleT) : VariableTrait if (isTuple!TupleT) {
         return !recent.empty;
     }
 
+    /// Returns: total elements in stable.
+    size_t countStable() {
+        return stable.map!"a.length".sum;
+    }
+
     void toString(Writer)(ref Writer w) if (isOutputRange!(Writer, char)) {
         import std.format : formattedWrite;
 
@@ -551,10 +559,20 @@ final class Variable(TupleT) : VariableTrait if (isTuple!TupleT) {
     }
 }
 
-template Variable(KeyT, ValueT) {
+/// Create a Variable type with a tuple of the provided types (`Args`).
+template Variable(Args...) {
     import std.typecons : Tuple;
+    import std.variant : Variant;
 
-    alias Variable = Variable!(Tuple!(KeyT, "key", ValueT, "value"));
+    static if (Args.length == 1) {
+        alias Variable = Variable!(Tuple!(Args[0], "key"));
+    } else static if (Args.length == 2) {
+        alias Variable = Variable!(Tuple!(Args[0], "key", Args[1], "value"));
+    } else {
+        import std.conv : to;
+
+        static assert(0, "1 or 2 parameters required. " ~ Args.length.to!string ~ " provided");
+    }
 }
 
 @("shall complete a variable")
@@ -745,4 +763,13 @@ unittest {
 
     // assert
     fast.complete.should == slow.complete;
+}
+
+@("shall count the elements in the nested arrays in stable")
+unittest {
+    auto var = new Variable!(int, int);
+    var.stable ~= relation!(int, int)([kvTuple(3, 2), kvTuple(4, 2)]);
+    var.stable ~= relation!(int, int)([kvTuple(3, 2), kvTuple(4, 2)]);
+
+    var.countStable.should == 4;
 }
