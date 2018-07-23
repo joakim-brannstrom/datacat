@@ -37,7 +37,7 @@ void perf_join() {
         return variable.complete;
     }
 
-    auto r = benchmark!(bench)(1);
+    auto r = benchmark!(bench)(10);
     logger.infof("%s %s: %s", __FUNCTION__, __LINE__, r);
 }
 
