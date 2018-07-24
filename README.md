@@ -60,6 +60,40 @@ auto fun() {
 }
 ```
 
+# Performance
+
+In the end I expect datafrog and datacat to be equal in performance. The languages have similare capabilities.
+
+This data is intended to show that datacat has achieved similare performance as the original implementation.
+
+The biggest culprite when I did the port where that completeSort constantly
+reordered the elements. See git commit b25827d and the method `Relation.merge`.
+
+This goes to show how important it is to have data before doing any optimizations.
+
+The dataset can be downloaded [from here](https://drive.google.com/drive/folders/0B8bQanV_QfNkbDJsOWc2WWk4SkE).
+It is the file at "Graphs/Apache Httpd 2.2.18 Dataflow/http_df".
+
+## Results
+
+```sh
+cd datafrog
+cargo build --release
+./target/release/graspan1 ~/httpd_df
+Duration { secs: 1, nanos: 531828020 }  Data loaded
+Duration { secs: 4, nanos: 86972216 }   Computation complete (nodes_final: 9393283)
+
+# ----
+cd datacat/test/standalone
+dub build --compiler=ldc2 -b release
+./build/graspan1 ~/httpd_df
+Shall calculate the dataflow from the provided file
+1 sec, 818 ms, and 891 μs: Data loaded
+3 secs, 488 ms, 353 μs, and 1 hnsec: Computation complete (nodes_final: 9393283)
+```
+
 # Credit
 
 All credit goes to Frank McSherry <fmcsherry@me.com> for the excellent blog post and implementation (this port). I highly recommend to read [Frank's blog](https://github.com/frankmcsherry/blog/blob/master/posts/2018-05-19.md).
+
+Credit also goes to the team that spurred Frank McSherry and provided the datasets. See there [paper](https://www.ics.uci.edu/~guoqingx/papers/wang-asplos17.pdf) and [implementation](https://github.com/Graspan/graspan-cpp)
