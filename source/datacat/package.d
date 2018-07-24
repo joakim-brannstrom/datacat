@@ -105,7 +105,6 @@ struct Relation(TupleT) {
     }
 
     /// Merges two relations into their union.
-    // TODO: compare the performance to the rust implementation
     auto merge(T)(T other)
             if (hasMember!(T, "elements") && is(ElementType!(typeof(other.elements)) == TupleT)) {
         // If one of the element lists is zero-length, we don't need to do any work
@@ -116,8 +115,22 @@ struct Relation(TupleT) {
             return this;
         }
 
+        auto elements2 = other.elements;
+
+        // Make sure that elements starts with the lower element
+        if (elements[0] > elements2[0]) {
+            elements2 = elements;
+            elements = other.elements;
+        }
+
+        // Fast path for when all the new elements are after the exiting ones
+        if (elements[$ - 1] < elements2[0]) {
+            elements ~= elements2;
+            return this;
+        }
+
         const len = elements.length;
-        elements ~= other.elements;
+        elements ~= elements2;
         completeSort(assumeSorted(elements[0 .. len]), elements[len .. $]);
         elements.length -= elements.uniq.copy(elements).length;
         return this;
@@ -678,10 +691,11 @@ unittest {
     auto result = variable.complete;
 
     // assert
+    result.should == relation!(int, int).from([[0, 1], [1, 2], [2, 1], [2, 3],
+            [3, 2], [3, 4], [4, 5], [5, 4], [5, 6], [6, 5], [6, 7], [7, 8], [8,
+            7], [8, 9], [9, 8], [9, 10],]);
+    //.map!(a => kvTuple(a[0], a[1]));
     result.length.should == 16;
-    result.should == [[0, 1], [1, 2], [2, 1], [2, 3], [3, 2], [3, 4], [4, 5],
-        [5, 4], [5, 6], [6, 5], [6, 7], [7, 8], [8, 7], [8, 9], [9, 8], [9, 10],].map!(
-            a => kvTuple(a[0], a[1]));
 }
 
 @("shall be the tuples that result from applying a function on the input")
