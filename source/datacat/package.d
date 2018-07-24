@@ -279,9 +279,7 @@ struct Iteration {
 
     /// Creates a new named variable associated with the iterative context.
     scope auto variable(T0, T1)(string s) {
-        import std.typecons : Tuple;
-
-        auto v = new Variable!(Tuple!(T0, "key", T1, "value"))(s);
+        auto v = new Variable!(KVTuple!(T0, T1))(s);
         variables ~= v;
         return v;
     }
