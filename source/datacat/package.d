@@ -39,20 +39,17 @@ public import datacat.range;
 
 version (unittest) import unit_threaded;
 
-alias KVTuple(T, V) = Tuple!(T, "key", V, "value");
+alias KVTuple(K, V) = Tuple!(K, "key", V, "value");
+alias KVTuple(K) = Tuple!(K, "key");
 
 /// Convenient function for creating a key/value tuple.
 auto kvTuple(K, V)(auto ref K k, auto ref V v) {
-    import std.typecons : tuple;
-
-    return tuple!("key", "value")(k, v);
+    return KVTuple!(K, V)(k, v);
 }
 
 /// ditto
 auto kvTuple(K)(auto ref K k) {
-    import std.typecons : tuple;
-
-    return tuple!("key")(k);
+    return KVTuple!(K)(k);
 }
 
 /// A static, ordered list of key-value pairs.
