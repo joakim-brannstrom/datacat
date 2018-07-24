@@ -107,6 +107,8 @@ struct Relation(TupleT) {
     /// Merges two relations into their union.
     auto merge(T)(T other)
             if (hasMember!(T, "elements") && is(ElementType!(typeof(other.elements)) == TupleT)) {
+        import std.array : appender, empty, popFront, front;
+
         // If one of the element lists is zero-length, we don't need to do any work
         if (elements.length == 0) {
             elements = other.elements;
@@ -130,9 +132,31 @@ struct Relation(TupleT) {
         }
 
         const len = elements.length;
-        elements ~= elements2;
-        completeSort(assumeSorted(elements[0 .. len]), elements[len .. $]);
-        elements.length -= elements.uniq.copy(elements).length;
+
+        auto elem = appender!(TupleT[])();
+        elem.reserve(len + elements2.length);
+
+        elem.put(elements[0]);
+        elements.popFront;
+        if (elem.data[0] == elements2[0]) {
+            elements2.popFront;
+        }
+
+        foreach (e; elements) {
+            foreach (e2; elements2[].until!(a => a >= e)) {
+                elem.put(e2);
+                elements2.popFront;
+            }
+            foreach (_; elements2[].until!(a => a > e))
+                elements2.popFront;
+            elem.put(e);
+        }
+
+        // Finish draining second list
+        foreach (e; elements2)
+            elem.put(e);
+
+        elements = elem.data;
         return this;
     }
 
