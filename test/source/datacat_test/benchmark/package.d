@@ -46,7 +46,7 @@ void perf_join() {
 void perf_parallel_join() {
     // requires 100 variables to achieve any notable speedup
 
-    auto bench(IterationKind Kind)() {
+    auto bench(ThreadStrategy Kind)() {
         // arrange
         auto iter = makeIteration!Kind;
 
@@ -71,10 +71,10 @@ void perf_parallel_join() {
         return vars.map!"a.complete".array;
     }
 
-    auto r0 = benchmark!(bench!(IterationKind.single))(10, __FUNCTION__ ~ "_single");
+    auto r0 = benchmark!(bench!(ThreadStrategy.single))(10, __FUNCTION__ ~ "_single");
     logger.infof("%s %s: %s", __FUNCTION__, __LINE__, r0);
 
-    auto r1 = benchmark!(bench!(IterationKind.parallel))(10, __FUNCTION__ ~ "_parallel");
+    auto r1 = benchmark!(bench!(ThreadStrategy.parallel))(10, __FUNCTION__ ~ "_parallel");
     logger.infof("%s %s: %s", __FUNCTION__, __LINE__, r1);
 }
 

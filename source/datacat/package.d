@@ -257,13 +257,13 @@ unittest {
 /// changed = Reports whether the variable has changed since it was last asked.
 package enum isVariable(T) = is(T : VariableTrait);
 
-enum IterationKind {
+enum ThreadStrategy {
     single,
     parallel
 }
 
-alias Iteration = IterationImpl!(IterationKind.single);
-alias ParallelIteration = IterationImpl!(IterationKind.parallel);
+alias Iteration = IterationImpl!(ThreadStrategy.single);
+alias ParallelIteration = IterationImpl!(ThreadStrategy.parallel);
 
 /** Make an `Iteration`.
  *
@@ -271,10 +271,10 @@ alias ParallelIteration = IterationImpl!(IterationKind.parallel);
  *
  * Returns: a parallel `Iteration`
  */
-auto makeIteration(IterationKind Kind)(TaskPool tpool = null) {
+auto makeIteration(ThreadStrategy Kind)(TaskPool tpool = null) {
     import std.parallelism : taskPool;
 
-    static if (Kind == IterationKind.parallel) {
+    static if (Kind == ThreadStrategy.parallel) {
         return ParallelIteration(() {
             if (tpool is null)
                 return taskPool;
@@ -290,8 +290,8 @@ auto makeIteration(IterationKind Kind)(TaskPool tpool = null) {
 /// An `Iteration` tracks monotonic variables, and monitors their progress.
 /// It can inform the user if they have ceased changing, at which point the
 /// computation should be done.
-struct IterationImpl(IterationKind Kind) {
-    static if (Kind == IterationKind.parallel) {
+struct IterationImpl(ThreadStrategy Kind) {
+    static if (Kind == ThreadStrategy.parallel) {
         TaskPool tpool;
         invariant {
             assert(tpool !is null, "the taskpool is required to be initialized for a parallel");
@@ -845,9 +845,9 @@ unittest {
     import std.range : iota;
 
     // arrange
-    auto iter_s = makeIteration!(IterationKind.single);
+    auto iter_s = makeIteration!(ThreadStrategy.single);
     auto single = iter_s.variable!(int, int)("fast");
-    auto iter_p = makeIteration!(IterationKind.parallel);
+    auto iter_p = makeIteration!(ThreadStrategy.parallel);
     auto parallel = iter_p.variable!(int, int)("slow");
     foreach (a; [single, parallel]) {
         a.insert(iota(10).map!(x => kvTuple(x, x + 1)));
