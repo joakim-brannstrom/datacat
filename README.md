@@ -71,6 +71,9 @@ reordered the elements. See git commit b25827d and the method `Relation.merge`.
 
 This goes to show how important it is to have data before doing any optimizations.
 
+The dataset can be downloaded [from here](https://drive.google.com/drive/folders/0B8bQanV_QfNkbDJsOWc2WWk4SkE).
+It is the file at "Graphs/Apache Httpd 2.2.18 Dataflow/http_df".
+
 ## Results
 
 ```sh
@@ -92,3 +95,5 @@ Shall calculate the dataflow from the provided file
 # Credit
 
 All credit goes to Frank McSherry <fmcsherry@me.com> for the excellent blog post and implementation (this port). I highly recommend to read [Frank's blog](https://github.com/frankmcsherry/blog/blob/master/posts/2018-05-19.md).
+
+Credit also goes to the team that spurred Frank McSherry and provided the datasets. See there [paper](https://www.ics.uci.edu/~guoqingx/papers/wang-asplos17.pdf) and [implementation](https://github.com/Graspan/graspan-cpp)
