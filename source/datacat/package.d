@@ -21,6 +21,7 @@ module datacat;
 import logger = std.experimental.logger;
 import std.traits : hasMember;
 import std.typecons : Tuple;
+import std.parallelism : TaskPool;
 
 public import std.typecons : tuple;
 
@@ -256,22 +257,67 @@ unittest {
 /// changed = Reports whether the variable has changed since it was last asked.
 package enum isVariable(T) = is(T : VariableTrait);
 
+enum IterationKind {
+    single,
+    parallel
+}
+
+alias Iteration = IterationImpl!(IterationKind.single);
+alias ParallelIteration = IterationImpl!(IterationKind.parallel);
+
+/** Make an `Iteration`.
+ *
+ * It affects all `Variable`s created through the `variable` method.
+ *
+ * Returns: a parallel `Iteration`
+ */
+auto makeIteration(IterationKind Kind)(TaskPool tpool = null) {
+    import std.parallelism : taskPool;
+
+    static if (Kind == IterationKind.parallel) {
+        return ParallelIteration(() {
+            if (tpool is null)
+                return taskPool;
+            else
+                return tpool;
+        }());
+    } else
+        return Iteration();
+}
+
 /// An iterative context for recursive evaluation.
 ///
 /// An `Iteration` tracks monotonic variables, and monitors their progress.
 /// It can inform the user if they have ceased changing, at which point the
 /// computation should be done.
-struct Iteration {
+struct IterationImpl(IterationKind Kind) {
+    static if (Kind == IterationKind.parallel) {
+        TaskPool tpool;
+        invariant {
+            assert(tpool !is null, "the taskpool is required to be initialized for a parallel");
+        }
+    }
+
     VariableTrait[] variables;
 
     /// Reports whether any of the monitored variables have changed since
     /// the most recent call.
     bool changed() {
+        import std.algorithm : map;
+
         bool r = false;
-        foreach (a; variables) {
-            if (a.changed)
+
+        static if (Kind == IterationKind.parallel) {
+            auto range_ = tpool.amap!"a.changed"(variables);
+        } else {
+            auto range_ = variables.map!"a.changed";
+        }
+
+        foreach (a; range_) {
+            if (a)
                 r = true;
         }
+
         return r;
         //TODO why didnt this work?
         //return variables.reduce!((a, b) => a.changed || b.changed);
@@ -798,6 +844,35 @@ unittest {
 
     // assert
     fast.complete.should == slow.complete;
+}
+
+@("shall produce the same result between the single and multithreaded Iteration")
+unittest {
+    import std.algorithm : map, count;
+    import std.range : iota;
+
+    // arrange
+    auto iter_s = makeIteration!(IterationKind.single);
+    auto single = iter_s.variable!(int, int)("fast");
+    auto iter_p = makeIteration!(IterationKind.parallel);
+    auto parallel = iter_p.variable!(int, int)("slow");
+    foreach (a; [single, parallel]) {
+        a.insert(iota(10).map!(x => kvTuple(x, x + 1)));
+        a.insert(iota(10).map!(x => kvTuple(x + 1, x)));
+    }
+
+    // act
+    static auto helper(T0, T1, T2)(T0 k, T1 v1, T2 v2) {
+        return kvTuple(v1, v2);
+    }
+
+    while (iter_s.changed)
+        single.fromJoin!(helper)(single, single);
+    while (iter_p.changed)
+        parallel.fromJoin!(helper)(parallel, parallel);
+
+    // assert
+    single.complete.should == parallel.complete;
 }
 
 @("shall count the elements in the nested arrays in stable")
