@@ -19,17 +19,7 @@ vectors again.
 module datacat;
 
 import logger = std.experimental.logger;
-import std.algorithm;
-import std.array;
-import std.ascii;
-import std.conv;
-import std.file;
-import std.path;
-import std.process;
-import std.range;
-import std.stdio;
-import std.string;
-import std.traits;
+import std.traits : hasMember;
 import std.typecons : Tuple;
 
 public import std.typecons : tuple;
@@ -58,6 +48,8 @@ auto kvTuple(K)(auto ref K k) {
 /// Datalog computation we want to be sure that certain relations are not able
 /// to vary (for example, in antijoins).
 struct Relation(TupleT) {
+    import std.range : isInputRange, ElementType;
+
     /// Convenient alias to retrieve the tuple type.
     alias TT = TupleT;
 
@@ -80,6 +72,7 @@ struct Relation(TupleT) {
     }
 
     this(T)(T other) if (isInputRange!T && is(ElementType!T == TupleT)) {
+        import std.algorithm : copy, sort, until, uniq;
         import std.array : appender;
 
         auto app = appender!(TupleT[])();
@@ -104,6 +97,7 @@ struct Relation(TupleT) {
     /// Merges two relations into their union.
     auto merge(T)(T other)
             if (hasMember!(T, "elements") && is(ElementType!(typeof(other.elements)) == TupleT)) {
+        import std.algorithm : until;
         import std.array : appender, empty, popFront, front;
 
         // If one of the element lists is zero-length, we don't need to do any work
@@ -496,6 +490,8 @@ final class Variable(TupleT) : VariableTrait if (isTuple!TupleT) {
     /// asserts that iteration has completed, in that `self.recent` and
     /// `self.to_add` should both be empty.
     Relation!TupleT complete() {
+        import std.array : empty;
+
         assert(recent.empty);
         assert(toAdd.empty);
 
@@ -509,7 +505,7 @@ final class Variable(TupleT) : VariableTrait if (isTuple!TupleT) {
     }
 
     override bool changed() {
-        import std.array : popBack, back, appender;
+        import std.array : popBack, back, appender, empty;
 
         // 1. Merge self.recent into self.stable.
         if (!recent.empty) {
@@ -580,6 +576,8 @@ final class Variable(TupleT) : VariableTrait if (isTuple!TupleT) {
 
     /// Returns: total elements in stable.
     size_t countStable() {
+        import std.algorithm : map, sum;
+
         return stable.map!"a.length".sum;
     }
 
@@ -626,6 +624,8 @@ unittest {
 
 @("shall progress a variable by moving newly added to the recent state")
 unittest {
+    import std.array : empty;
+
     // arrange
     auto a = new Variable!(int, int);
     a.insert(relation!(int, int).from([[1, 10], [2, 20], [5, 50]]));
@@ -644,6 +644,8 @@ unittest {
 
 @("shall progress from toAdd to stable after two `changed`")
 unittest {
+    import std.array : empty;
+
     // arrange
     auto a = new Variable!(int, int);
     a.insert(relation!(int, int).from([[1, 10], [2, 20], [5, 50]]));
