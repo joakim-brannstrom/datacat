@@ -7,6 +7,7 @@ module app;
 
 enum Name {
     perf_join,
+    perf_parallel_join,
     perf_antijoin,
     perf_map,
 }
@@ -39,6 +40,7 @@ int main(string[] args) {
     bns[Name.perf_join] = &datacat_test.benchmark.perf_join;
     bns[Name.perf_antijoin] = &datacat_test.benchmark.perf_antijoin;
     bns[Name.perf_map] = &datacat_test.benchmark.perf_map;
+    bns[Name.perf_parallel_join] = &datacat_test.benchmark.perf_parallel_join;
 
     foreach (b; run_bench) {
         writeln("Running ", b);

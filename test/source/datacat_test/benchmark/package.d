@@ -10,7 +10,9 @@ module datacat_test.benchmark;
 import core.time;
 import logger = std.experimental.logger;
 import std.algorithm : map, filter;
+import std.array : array;
 import std.range : iota;
+import std.traits : ReturnType;
 
 import datacat;
 import datacat_test.common;
@@ -39,6 +41,41 @@ void perf_join() {
 
     auto r = benchmark!(bench)(10);
     logger.infof("%s %s: %s", __FUNCTION__, __LINE__, r);
+}
+
+void perf_parallel_join() {
+    // requires 100 variables to achieve any notable speedup
+
+    auto bench(IterationKind Kind)() {
+        // arrange
+        auto iter = makeIteration!Kind;
+
+        Variable!(KVTuple!(int, int))[] vars;
+
+        foreach (i; 0 .. 100) {
+            vars ~= iter.variable!(int, int)("source");
+            vars[$-1].insert(relation!(int, int).from(iota(100).map!(x => tuple(x, x + 1))));
+            vars[$-1].insert(relation!(int, int).from(iota(100).map!(x => tuple(x + 1, x))));
+        }
+
+        // act
+        while (iter.changed) {
+            static auto helper(T0, T1, T2)(T0 k, T1 v1, T2 v2) {
+                return kvTuple(v1, v2);
+            }
+
+            foreach (ref v; vars)
+                v.fromJoin!(helper)(v, v);
+        }
+
+        return vars.map!"a.complete".array;
+    }
+
+    auto r0 = benchmark!(bench!(IterationKind.single))(10, __FUNCTION__ ~ "_single");
+    logger.infof("%s %s: %s", __FUNCTION__, __LINE__, r0);
+
+    auto r1 = benchmark!(bench!(IterationKind.parallel))(10, __FUNCTION__ ~ "_parallel");
+    logger.infof("%s %s: %s", __FUNCTION__, __LINE__, r1);
 }
 
 void perf_antijoin() {
