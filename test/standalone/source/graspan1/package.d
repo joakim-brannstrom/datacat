@@ -86,7 +86,7 @@ int main(string[] args) {
     auto reachable = variable1.complete;
 
     timer.stop;
-    writefln("%s: Computation complete (nodes_final: %s", timer.peek, reachable.length);
+    writefln("%s: Computation complete (nodes_final: %s)", timer.peek, reachable.length);
 
     return 0;
 }
