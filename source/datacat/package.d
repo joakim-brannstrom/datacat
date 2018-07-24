@@ -306,14 +306,7 @@ struct IterationImpl(IterationKind Kind) {
         import std.algorithm : map;
 
         bool r = false;
-
-        static if (Kind == IterationKind.parallel) {
-            auto range_ = tpool.amap!"a.changed"(variables);
-        } else {
-            auto range_ = variables.map!"a.changed";
-        }
-
-        foreach (a; range_) {
+        foreach (a; variables.map!"a.changed") {
             if (a)
                 r = true;
         }
