@@ -41,12 +41,12 @@ struct BenchResult {
     }
 }
 
-auto benchmark(alias fn)(int times, string func = __FUNCTION__) {
+auto benchmark(alias fn)(int times, string name) {
     import std.datetime.stopwatch : StopWatch;
     import std.typecons : Yes, RefCounted;
     import std.stdio;
 
-    auto res = RefCounted!BenchResult(func);
+    auto res = RefCounted!BenchResult(name);
     foreach (const i; 0 .. times) {
         auto sw = StopWatch(Yes.autoStart);
         auto fnres = fn();

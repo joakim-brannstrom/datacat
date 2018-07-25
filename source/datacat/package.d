@@ -21,6 +21,7 @@ module datacat;
 import logger = std.experimental.logger;
 import std.traits : hasMember;
 import std.typecons : Tuple;
+import std.parallelism : TaskPool, taskPool;
 
 public import std.typecons : tuple;
 
@@ -57,7 +58,12 @@ struct Relation(TupleT) {
     TupleT[] elements;
     alias elements this;
 
-    static auto from(T)(T values) {
+    /** Convenient function to create a `Relation` from an array containing
+     * values with the length 2.
+     *
+     * Returns: a `Relation`.
+     */
+    static auto from(T, ThreadStrategy TS = ThreadStrategy.single)(T values) {
         import std.algorithm : map;
 
         static if (hasKeyValueFields!TupleT) {
@@ -71,26 +77,65 @@ struct Relation(TupleT) {
         }
     }
 
-    this(T)(T other) if (isInputRange!T && is(ElementType!T == TupleT)) {
+    /** Create an instance.
+     *
+     * If the input is sorted no further sorting is done.
+     *
+     * Params:
+     *  other = the source to pull elements from.
+     */
+    this(ThreadStrategy TS = ThreadStrategy.single, T, ARGS...)(T other, auto ref ARGS args) if (isInputRange!T && is(ElementType!T == TupleT) && (TS == ThreadStrategy.parallel && ARGS.length == 1 && is(ARGS[0] == TaskPool) || TS == ThreadStrategy.single)) {
         import std.algorithm : copy, sort, until, uniq;
         import std.array : appender;
+        import std.range : SortedRange, hasLength;
 
         auto app = appender!(TupleT[])();
+
+        static if (hasLength!T)
+            app.reserve(other.length);
+
         other.copy(app);
-        sort(app.data);
+
+        static if (is(T : SortedRange!U, U)) {
+            // do nothing
+        } else static if (TS == ThreadStrategy.parallel) {
+            // code copied from std.parallelism
+            static void parallelSort(T)(T[] data, TaskPool pool) {
+                import std.parallelism : task;
+                import std.algorithm : swap, partition;
+
+                // Sort small subarrays serially.
+                if (data.length < 100) {
+                    static import std.algorithm;
+
+                    std.algorithm.sort(data);
+                    return;
+                }
+
+                // Partition the array.
+                swap(data[$ / 2], data[$ - 1]);
+                auto pivot = data[$ - 1];
+                bool lessThanPivot(T elem) { return elem < pivot; }
+
+                auto greaterEqual = partition!lessThanPivot(data[0..$ - 1]);
+                swap(data[$ - greaterEqual.length - 1], data[$ - 1]);
+
+                auto less = data[0..$ - greaterEqual.length - 1];
+                greaterEqual = data[$ - greaterEqual.length..$];
+
+                // Execute both recursion branches in parallel.
+                auto recurseTask = task!parallelSort(greaterEqual, pool);
+                pool.put(recurseTask);
+                parallelSort(less, pool);
+                recurseTask.yieldForce;
+            }
+            TaskPool pool = args[0];
+            parallelSort(app.data, pool);
+        } else {
+            sort(app.data);
+        }
 
         elements.length = app.data.length;
-        elements.length -= app.data.uniq.copy(elements).length;
-    }
-
-    this(T)(const(T)[] other) if (is(T == TupleT)) {
-        import std.array : appender;
-
-        auto app = appender!(TupleT[])();
-        app.reserve(other.length);
-        other.copy(app);
-        sort(app.data);
-
         elements.length -= app.data.uniq.copy(elements).length;
     }
 
@@ -208,6 +253,14 @@ template relation(Args...) {
     }
 }
 
+@("shall create a Relation using the parallel sort strategy")
+unittest {
+    import std.algorithm : map;
+
+    Relation!(KVTuple!(int, int)) a;
+    a.__ctor!(ThreadStrategy.parallel)([kvTuple(1,2)].map!"a", taskPool);
+}
+
 @("shall merge two relations")
 unittest {
     auto a = relation!(int, int).from([[1, 0], [2, -1], [5, -20]]);
@@ -256,22 +309,60 @@ unittest {
 /// changed = Reports whether the variable has changed since it was last asked.
 package enum isVariable(T) = is(T : VariableTrait);
 
+enum ThreadStrategy {
+    single,
+    parallel
+}
+
+alias Iteration = IterationImpl!(ThreadStrategy.single);
+alias ParallelIteration = IterationImpl!(ThreadStrategy.parallel);
+
+/** Make an `Iteration`.
+ *
+ * It affects all `Variable`s created through the `variable` method.
+ *
+ * Returns: a parallel `Iteration`
+ */
+auto makeIteration(ThreadStrategy Kind)(TaskPool tpool = null) {
+    import std.parallelism : taskPool;
+
+    static if (Kind == ThreadStrategy.parallel) {
+        return ParallelIteration(() {
+            if (tpool is null)
+                return taskPool;
+            else
+                return tpool;
+        }());
+    } else
+        return Iteration();
+}
+
 /// An iterative context for recursive evaluation.
 ///
 /// An `Iteration` tracks monotonic variables, and monitors their progress.
 /// It can inform the user if they have ceased changing, at which point the
 /// computation should be done.
-struct Iteration {
+struct IterationImpl(ThreadStrategy Kind) {
+    static if (Kind == ThreadStrategy.parallel) {
+        TaskPool taskPool;
+        invariant {
+            assert(taskPool !is null, "the taskpool is required to be initialized for a parallel");
+        }
+    }
+
     VariableTrait[] variables;
 
     /// Reports whether any of the monitored variables have changed since
     /// the most recent call.
     bool changed() {
+        import std.algorithm : map;
+
         bool r = false;
-        foreach (a; variables) {
-            if (a.changed)
+        foreach (a; variables.map!"a.changed") {
+            if (a)
                 r = true;
         }
+
         return r;
         //TODO why didnt this work?
         //return variables.reduce!((a, b) => a.changed || b.changed);
@@ -279,9 +370,11 @@ struct Iteration {
 
     /// Creates a new named variable associated with the iterative context.
     scope auto variable(T0, T1)(string s) {
-        import std.typecons : Tuple;
-
-        auto v = new Variable!(Tuple!(T0, "key", T1, "value"))(s);
+        static if (Kind == ThreadStrategy.single) {
+            auto v = new Variable!(KVTuple!(T0, T1), Kind)(s);
+        } else {
+            auto v = new Variable!(KVTuple!(T0, T1), Kind)(s, taskPool);
+        }
         variables ~= v;
         return v;
     }
@@ -291,7 +384,11 @@ struct Iteration {
     /// This variable will not be maintained distinctly, and may advertise tuples as
     /// recent multiple times (perhaps unbounded many times).
     scope auto variableInDistinct(T0, T1)(string s) {
-        auto v = this.variable!(T0, T1)(s);
+        static if (Kind == ThreadStrategy.single) {
+            auto v = new Variable!(KVTuple!(T0, T1), Kind)(s);
+        } else {
+            auto v = new Variable!(KVTuple!(T0, T1), Kind)(s, taskPool);
+        }
         v.distinct = false;
         return v;
     }
@@ -329,8 +426,10 @@ interface VariableTrait {
 /// and it is important that any cycle of derivations have at least one de-duplicating
 /// variable on it.
 /// TODO: tuple should be constrainted to something with Key/Value.
-final class Variable(TupleT) : VariableTrait if (isTuple!TupleT) {
+final class Variable(TupleT, ThreadStrategy TS = ThreadStrategy.single) : VariableTrait if (isTuple!TupleT) {
     import std.range : isInputRange, ElementType, isOutputRange;
+
+    TaskPool taskPool;
 
     /// Convenient alias to retrieve the tuple type.
     alias TT = TupleT;
@@ -357,11 +456,24 @@ final class Variable(TupleT) : VariableTrait if (isTuple!TupleT) {
     /// A list of future tuples, to be introduced.
     Relation!TupleT[] toAdd;
 
-    this() {
+    static if (TS == ThreadStrategy.single) {
+        this() {
+        }
+
+        this(string name) {
+            this.name = name;
+        }
     }
 
-    this(string name) {
+    this(TaskPool tp) {
+        static if (TS == ThreadStrategy.parallel)
+            this.taskPool = tp;
+    }
+
+    this(string name, TaskPool tp) {
         this.name = name;
+        static if (TS == ThreadStrategy.parallel)
+            this.taskPool = tp;
     }
 
     /// Adds tuples that result from joining `input1` and `input2`.
@@ -390,7 +502,7 @@ final class Variable(TupleT) : VariableTrait if (isTuple!TupleT) {
     void fromJoin(alias Fn, Input1T, Input2T)(Input1T input1, Input2T input2) {
         import datacat.join;
 
-        join!Fn(input1, input2, this);
+        join!(Fn, TS)(input1, input2, this);
     }
 
     /// Adds tuples from `input1` whose key is not present in `input2`.
@@ -420,7 +532,7 @@ final class Variable(TupleT) : VariableTrait if (isTuple!TupleT) {
     void fromAntiJoin(alias Fn, Input1T, Input2T)(Input1T input1, Input2T input2) {
         import datacat.join;
 
-        antiJoin!Fn(input1, input2, this);
+        antiJoin!(Fn, TS)(input1, input2, this);
     }
 
     /// Adds tuples that result from mapping `input`.
@@ -455,7 +567,7 @@ final class Variable(TupleT) : VariableTrait if (isTuple!TupleT) {
     void fromMap(alias Fn, Input1T)(Input1T input) {
         import datacat.map;
 
-        mapInto!Fn(input, this);
+        mapInto!(Fn, TS)(input, this);
     }
 
     /// Inserts a relation into the variable.
@@ -800,6 +912,36 @@ unittest {
 
     // assert
     fast.complete.should == slow.complete;
+}
+
+@("shall produce the same result between the single and multithreaded Iteration")
+unittest {
+    import std.algorithm : map, count;
+    import std.range : iota;
+
+    // arrange
+    auto iter_s = makeIteration!(ThreadStrategy.single);
+    auto single = iter_s.variable!(int, int)("fast");
+    single.insert(iota(10).map!(x => kvTuple(x, x + 1)));
+    single.insert(iota(10).map!(x => kvTuple(x + 1, x)));
+
+    auto iter_p = makeIteration!(ThreadStrategy.parallel);
+    auto parallel = iter_p.variable!(int, int)("slow");
+    parallel.insert(iota(10).map!(x => kvTuple(x, x + 1)));
+    parallel.insert(iota(10).map!(x => kvTuple(x + 1, x)));
+
+    // act
+    static auto helper(T0, T1, T2)(T0 k, T1 v1, T2 v2) {
+        return kvTuple(v1, v2);
+    }
+
+    while (iter_s.changed)
+        single.fromJoin!(helper)(single, single);
+    while (iter_p.changed)
+        parallel.fromJoin!(helper)(parallel, parallel);
+
+    // assert
+    single.complete.should == parallel.complete;
 }
 
 @("shall count the elements in the nested arrays in stable")

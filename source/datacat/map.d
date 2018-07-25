@@ -9,10 +9,19 @@ Functionality for mapping a function on a variable.
 */
 module datacat.map;
 
-import datacat : Variable, Relation;
+import std.traits : hasMember;
+
+import datacat : Relation, ThreadStrategy;
 
 // TODO: add constraint on Fn that the param is T1 returning T2.
-void mapInto(alias logicFn, InputT, OutputT)(InputT input, OutputT output) {
+/**
+ *
+ * The task pool from `output` is used if the `ThreadStrategy` is parallel.
+ *
+ * Params:
+ *  output = the result of the join
+ */
+void mapInto(alias logicFn, ThreadStrategy TS, InputT, OutputT)(InputT input, OutputT output) {
     import std.array : appender;
 
     auto results = appender!(OutputT.TT[])();
@@ -20,5 +29,10 @@ void mapInto(alias logicFn, InputT, OutputT)(InputT input, OutputT output) {
     foreach (v; input.recent)
         results.put(logicFn(v));
 
-    output.insert(Relation!(OutputT.TT)(results.data));
+    Relation!(OutputT.TT) rel;
+    static if (hasMember!(OutputT, "taskPool"))
+        rel.__ctor!(TS)(results.data, output.taskPool);
+    else
+        static assert(0, "output (" ~ OutputT.stringof ~ ") has no member taskPool");
+    output.insert(rel);
 }

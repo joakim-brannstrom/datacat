@@ -60,33 +60,44 @@ int main(string[] args) {
     }
 
     writefln("%s: Data loaded", timer.peek);
-    timer.reset;
 
     // Create a new iteration context, ...
-    Iteration iter;
+    void run(T)(ref T iter) {
+        auto timer = StopWatch(Yes.autoStart);
+        // .. some variables, ..
+        auto variable1 = iter.variable!(uint, uint)("nodes");
+        auto variable2 = iter.variable!(uint, uint)("edges");
 
-    // .. some variables, ..
-    auto variable1 = iter.variable!(uint, uint)("nodes");
-    auto variable2 = iter.variable!(uint, uint)("edges");
+        // .. load them with some initial values, ..
+        variable1.insert(nodes.data);
+        variable2.insert(edges.data);
 
-    // .. load them with some initial values, ..
-    variable1.insert(nodes.data);
-    variable2.insert(edges.data);
+        // .. and then start iterating rules!
+        while (iter.changed) {
+            // N(a,c) <-  N(a,b), E(b,c)
+            static auto helper(T0, T1, T2)(T0 b, T1 a, T2 c) {
+                return kvTuple(c, a);
+            }
 
-    // .. and then start iterating rules!
-    while (iter.changed) {
-        // N(a,c) <-  N(a,b), E(b,c)
-        static auto helper(T0, T1, T2)(T0 b, T1 a, T2 c) {
-            return kvTuple(c, a);
+            variable1.fromJoin!helper(variable1, variable2);
         }
 
-        variable1.fromJoin!helper(variable1, variable2);
+        auto reachable = variable1.complete;
+
+        timer.stop;
+        writefln("%s: Computation complete (nodes_final: %s)", timer.peek, reachable.length);
     }
 
-    auto reachable = variable1.complete;
-
-    timer.stop;
-    writefln("%s: Computation complete (nodes_final: %s)", timer.peek, reachable.length);
+    {
+        writeln("Single threaded");
+        Iteration iter;
+        run(iter);
+    }
+    {
+        writeln("Multi threaded");
+        auto iter = makeIteration!(ThreadStrategy.parallel);
+        run(iter);
+    }
 
     return 0;
 }
