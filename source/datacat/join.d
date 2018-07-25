@@ -42,7 +42,7 @@ void join(alias logicFn, ThreadStrategy TS, Input1T, Input2T, OutputT)(
 
     joinHelper!fn(recent1, recent2);
 
-    Relation!(Input1T.TT) rel;
+    Relation!(OutputT.TT) rel;
     static if (hasMember!(OutputT, "taskPool"))
         rel.__ctor!(TS)(results.data, output.taskPool);
     else
