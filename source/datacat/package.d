@@ -72,26 +72,29 @@ struct Relation(TupleT) {
         }
     }
 
+    /** Create an instance.
+     *
+     * If the input is sorted no further sorting is done.
+     *
+     * Params:
+     *  other = the source to pull elements from.
+     */
     this(T)(T other) if (isInputRange!T && is(ElementType!T == TupleT)) {
         import std.algorithm : copy, sort, until, uniq;
         import std.array : appender;
+        import std.range : SortedRange, hasLength;
 
         auto app = appender!(TupleT[])();
+
+        static if (hasLength!T)
+            app.reserve(other.length);
+
         other.copy(app);
-        sort(app.data);
+
+        static if (!is(T : SortedRange!U, U))
+            sort(app.data);
 
         elements.length = app.data.length;
-        elements.length -= app.data.uniq.copy(elements).length;
-    }
-
-    this(T)(const(T)[] other) if (is(T == TupleT)) {
-        import std.array : appender;
-
-        auto app = appender!(TupleT[])();
-        app.reserve(other.length);
-        other.copy(app);
-        sort(app.data);
-
         elements.length -= app.data.uniq.copy(elements).length;
     }
 
