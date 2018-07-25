@@ -321,7 +321,7 @@ struct IterationImpl(ThreadStrategy Kind) {
 
     /// Creates a new named variable associated with the iterative context.
     scope auto variable(T0, T1)(string s) {
-        auto v = new Variable!(KVTuple!(T0, T1))(s);
+        auto v = new Variable!(KVTuple!(T0, T1), Kind)(s);
         variables ~= v;
         return v;
     }
@@ -331,7 +331,7 @@ struct IterationImpl(ThreadStrategy Kind) {
     /// This variable will not be maintained distinctly, and may advertise tuples as
     /// recent multiple times (perhaps unbounded many times).
     scope auto variableInDistinct(T0, T1)(string s) {
-        auto v = this.variable!(T0, T1)(s);
+        auto v = new Variable!(KVTuple!(T0, T1), Kind)(s);
         v.distinct = false;
         return v;
     }
@@ -369,7 +369,7 @@ interface VariableTrait {
 /// and it is important that any cycle of derivations have at least one de-duplicating
 /// variable on it.
 /// TODO: tuple should be constrainted to something with Key/Value.
-final class Variable(TupleT) : VariableTrait if (isTuple!TupleT) {
+final class Variable(TupleT, ThreadStrategy Kind = ThreadStrategy.single) : VariableTrait if (isTuple!TupleT) {
     import std.range : isInputRange, ElementType, isOutputRange;
 
     /// Convenient alias to retrieve the tuple type.
@@ -850,12 +850,13 @@ unittest {
     // arrange
     auto iter_s = makeIteration!(ThreadStrategy.single);
     auto single = iter_s.variable!(int, int)("fast");
+    single.insert(iota(10).map!(x => kvTuple(x, x + 1)));
+    single.insert(iota(10).map!(x => kvTuple(x + 1, x)));
+
     auto iter_p = makeIteration!(ThreadStrategy.parallel);
     auto parallel = iter_p.variable!(int, int)("slow");
-    foreach (a; [single, parallel]) {
-        a.insert(iota(10).map!(x => kvTuple(x, x + 1)));
-        a.insert(iota(10).map!(x => kvTuple(x + 1, x)));
-    }
+    parallel.insert(iota(10).map!(x => kvTuple(x, x + 1)));
+    parallel.insert(iota(10).map!(x => kvTuple(x + 1, x)));
 
     // act
     static auto helper(T0, T1, T2)(T0 k, T1 v1, T2 v2) {

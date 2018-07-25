@@ -50,7 +50,7 @@ void perf_parallel_join() {
         // arrange
         auto iter = makeIteration!Kind;
 
-        Variable!(KVTuple!(int, int))[] vars;
+        Variable!(KVTuple!(int, int), Kind)[] vars;
 
         foreach (i; 0 .. 100) {
             vars ~= iter.variable!(int, int)("source");
