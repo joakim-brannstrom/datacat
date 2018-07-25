@@ -602,6 +602,16 @@ final class Variable(TupleT, ThreadStrategy TS = ThreadStrategy.single) : Variab
         }
     }
 
+    /// ditto
+    void insert(T)(T[][] relation) {
+        import std.algorithm : map;
+
+        if (relation.length == 0)
+            return;
+
+        toAdd ~= relation.map!(a => KVTuple!(T,T)(a[0], a[1])).Relation!(KVTuple!(T,T));
+    }
+
     /// Consumes the variable and returns a relation.
     ///
     /// This method removes the ability for the variable to develop, and
