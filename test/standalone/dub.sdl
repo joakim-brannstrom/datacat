@@ -18,4 +18,13 @@ configuration "graspan1" {
     targetType "executable"
     sourcePaths "source/graspan1"
     importPaths "source/graspan1"
+    excludedSourceFiles "source/example/*"
+}
+
+configuration "example" {
+    targetName "example"
+    targetType "executable"
+    sourcePaths "source/example"
+    importPaths "source/example"
+    excludedSourceFiles "source/graspan1/*"
 }
