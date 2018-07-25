@@ -10,17 +10,19 @@ Functionality for joining Variables.
 module datacat.join;
 
 import logger = std.experimental.logger;
-import std.traits;
+import std.traits : hasMember;
 
-import datacat : Variable, Relation, hasKeyField, hasValueField,
-    hasKeyValueFields, ThreadStrategy;
+import datacat : Relation, ThreadStrategy;
 
 // TODO: change Input1T and Input2T to KeyT, Val1T, Val2T.
 // Add condition that logicFn(ref Key, ref Val1, ref Val2)->Result
 // Add condition that OutputT!Result, the Result is the same as the return type of logicFn.
-/** TODO: add description
+/** Perform a cross-product between `input1` and `input2` by applying `logicFn`.
+ *
+ * The task pool from `output` is used if the `ThreadStrategy` is parallel.
+ *
  * Params:
- *  output = the result of the cross product between input1 and input2 by applying logicFn
+ *  output = the result of the join
  */
 void join(alias logicFn, ThreadStrategy TS, Input1T, Input2T, OutputT)(Input1T input1, Input2T input2, OutputT output) {
     import std.array : appender;
@@ -40,11 +42,20 @@ void join(alias logicFn, ThreadStrategy TS, Input1T, Input2T, OutputT)(Input1T i
     joinHelper!fn(recent1, recent2);
 
     Relation!(Input1T.TT) rel;
-    rel.__ctor!(TS)(results.data, input1.tpool);
+    static if (hasMember!(OutputT, "taskPool"))
+        rel.__ctor!(TS)(results.data, output.taskPool);
+    else
+        static assert(0, "output (" ~ OutputT.stringof ~ ") has no member taskPool");
     output.insert(rel);
 }
 
-/// Moves all recent tuples from `input1` that are not present in `input2` into `output`.
+/** Moves all recent tuples from `input1` that are not present in `input2` into `output`.
+ *
+ * The task pool from `output` is used if the `ThreadStrategy` is parallel.
+ *
+ * Params:
+ *  output = the result of the join
+ */
 void antiJoin(alias logicFn, ThreadStrategy TS, Input1T, Input2T, OutputT)(Input1T input1,
         Input2T input2, OutputT output) {
     import std.array : appender, empty;
@@ -59,7 +70,10 @@ void antiJoin(alias logicFn, ThreadStrategy TS, Input1T, Input2T, OutputT)(Input
     }
 
     Relation!(OutputT.TT) rel;
-    rel.__ctor!(TS)(results.data, input1.tpool);
+    static if (hasMember!(OutputT, "taskPool"))
+        rel.__ctor!(TS)(results.data, output.taskPool);
+    else
+        static assert(0, "output (" ~ OutputT.stringof ~ ") has no member taskPool");
     output.insert(rel);
 }
 

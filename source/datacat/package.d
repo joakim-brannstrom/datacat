@@ -100,12 +100,14 @@ struct Relation(TupleT) {
             // do nothing
         } else static if (TS == ThreadStrategy.parallel) {
             // code copied from std.parallelism
-            import std.parallelism;
-            import std.algorithm;
-
             static void parallelSort(T)(T[] data, TaskPool pool) {
+                import std.parallelism : task;
+                import std.algorithm : swap, partition;
+
                 // Sort small subarrays serially.
                 if (data.length < 100) {
+                    static import std.algorithm;
+
                     std.algorithm.sort(data);
                     return;
                 }
@@ -342,9 +344,9 @@ auto makeIteration(ThreadStrategy Kind)(TaskPool tpool = null) {
 /// computation should be done.
 struct IterationImpl(ThreadStrategy Kind) {
     static if (Kind == ThreadStrategy.parallel) {
-        TaskPool tpool;
+        TaskPool taskPool;
         invariant {
-            assert(tpool !is null, "the taskpool is required to be initialized for a parallel");
+            assert(taskPool !is null, "the taskpool is required to be initialized for a parallel");
         }
     }
 
@@ -371,7 +373,7 @@ struct IterationImpl(ThreadStrategy Kind) {
         static if (Kind == ThreadStrategy.single) {
             auto v = new Variable!(KVTuple!(T0, T1), Kind)(s);
         } else {
-            auto v = new Variable!(KVTuple!(T0, T1), Kind)(s, tpool);
+            auto v = new Variable!(KVTuple!(T0, T1), Kind)(s, taskPool);
         }
         variables ~= v;
         return v;
@@ -385,7 +387,7 @@ struct IterationImpl(ThreadStrategy Kind) {
         static if (Kind == ThreadStrategy.single) {
             auto v = new Variable!(KVTuple!(T0, T1), Kind)(s);
         } else {
-            auto v = new Variable!(KVTuple!(T0, T1), Kind)(s, tpool);
+            auto v = new Variable!(KVTuple!(T0, T1), Kind)(s, taskPool);
         }
         v.distinct = false;
         return v;
@@ -427,7 +429,7 @@ interface VariableTrait {
 final class Variable(TupleT, ThreadStrategy TS = ThreadStrategy.single) : VariableTrait if (isTuple!TupleT) {
     import std.range : isInputRange, ElementType, isOutputRange;
 
-    TaskPool tpool;
+    TaskPool taskPool;
 
     /// Convenient alias to retrieve the tuple type.
     alias TT = TupleT;
@@ -465,13 +467,13 @@ final class Variable(TupleT, ThreadStrategy TS = ThreadStrategy.single) : Variab
 
     this(TaskPool tp) {
         static if (TS == ThreadStrategy.parallel)
-            this.tpool = tp;
+            this.taskPool = tp;
     }
 
     this(string name, TaskPool tp) {
         this.name = name;
         static if (TS == ThreadStrategy.parallel)
-            this.tpool = tp;
+            this.taskPool = tp;
     }
 
     /// Adds tuples that result from joining `input1` and `input2`.
