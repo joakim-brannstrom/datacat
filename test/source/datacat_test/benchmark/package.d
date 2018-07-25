@@ -39,7 +39,7 @@ void perf_join() {
         return variable.complete;
     }
 
-    auto r = benchmark!(bench)(10);
+    auto r = benchmark!(bench)(10, "join");
     logger.infof("%s %s: %s", __FUNCTION__, __LINE__, r);
 }
 
@@ -71,10 +71,10 @@ void perf_parallel_join() {
         return vars.map!"a.complete".array;
     }
 
-    auto r0 = benchmark!(bench!(ThreadStrategy.single))(10, __FUNCTION__ ~ "_single");
+    auto r0 = benchmark!(bench!(ThreadStrategy.single))(10, "parallel_join_single");
     logger.infof("%s %s: %s", __FUNCTION__, __LINE__, r0);
 
-    auto r1 = benchmark!(bench!(ThreadStrategy.parallel))(10, __FUNCTION__ ~ "_parallel");
+    auto r1 = benchmark!(bench!(ThreadStrategy.parallel))(10, "parallel_join_parallel");
     logger.infof("%s %s: %s", __FUNCTION__, __LINE__, r1);
 }
 
@@ -99,7 +99,7 @@ void perf_antijoin() {
         return variable.complete;
     }
 
-    auto r = benchmark!(bench)(10);
+    auto r = benchmark!(bench)(10, "antijoin");
     logger.infof("%s %s: %s", __FUNCTION__, __LINE__, r);
 }
 
@@ -125,6 +125,6 @@ void perf_map() {
         return variable.complete;
     }
 
-    auto r = benchmark!(bench)(10);
+    auto r = benchmark!(bench)(10, "map");
     logger.infof("%s %s: %s", __FUNCTION__, __LINE__, r);
 }
