@@ -40,7 +40,7 @@ void join(alias logicFn, ThreadStrategy TS, Input1T, Input2T, OutputT)(Input1T i
     joinHelper!fn(recent1, recent2);
 
     Relation!(Input1T.TT) rel;
-    rel.__ctor!(TS)(results.data);
+    rel.__ctor!(TS)(results.data, input1.tpool);
     output.insert(rel);
 }
 
@@ -59,7 +59,7 @@ void antiJoin(alias logicFn, ThreadStrategy TS, Input1T, Input2T, OutputT)(Input
     }
 
     Relation!(OutputT.TT) rel;
-    rel.__ctor!(TS)(results.data);
+    rel.__ctor!(TS)(results.data, input1.tpool);
     output.insert(rel);
 }
 

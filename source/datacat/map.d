@@ -21,6 +21,6 @@ void mapInto(alias logicFn, ThreadStrategy TS, InputT, OutputT)(InputT input, Ou
         results.put(logicFn(v));
 
     Relation!(OutputT.TT) rel;
-    rel.__ctor!(TS)(results.data);
+    rel.__ctor!(TS)(results.data, input.tpool);
     output.insert(rel);
 }

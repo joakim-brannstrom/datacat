@@ -21,7 +21,7 @@ module datacat;
 import logger = std.experimental.logger;
 import std.traits : hasMember;
 import std.typecons : Tuple;
-import std.parallelism : TaskPool;
+import std.parallelism : TaskPool, taskPool;
 
 public import std.typecons : tuple;
 
@@ -84,7 +84,7 @@ struct Relation(TupleT) {
      * Params:
      *  other = the source to pull elements from.
      */
-    this(ThreadStrategy TS = ThreadStrategy.single, T)(T other) if (isInputRange!T && is(ElementType!T == TupleT)) {
+    this(ThreadStrategy TS = ThreadStrategy.single, T, ARGS...)(T other, auto ref ARGS args) if (isInputRange!T && is(ElementType!T == TupleT) && (TS == ThreadStrategy.parallel && ARGS.length == 1 && is(ARGS[0] == TaskPool) || TS == ThreadStrategy.single)) {
         import std.algorithm : copy, sort, until, uniq;
         import std.array : appender;
         import std.range : SortedRange, hasLength;
@@ -103,7 +103,7 @@ struct Relation(TupleT) {
             import std.parallelism;
             import std.algorithm;
 
-            static void parallelSort(T)(T[] data) {
+            static void parallelSort(T)(T[] data, TaskPool pool) {
                 // Sort small subarrays serially.
                 if (data.length < 100) {
                     std.algorithm.sort(data);
@@ -122,12 +122,13 @@ struct Relation(TupleT) {
                 greaterEqual = data[$ - greaterEqual.length..$];
 
                 // Execute both recursion branches in parallel.
-                auto recurseTask = task!parallelSort(greaterEqual);
-                taskPool.put(recurseTask);
-                parallelSort(less);
+                auto recurseTask = task!parallelSort(greaterEqual, pool);
+                pool.put(recurseTask);
+                parallelSort(less, pool);
                 recurseTask.yieldForce;
             }
-            parallelSort(app.data);
+            TaskPool pool = args[0];
+            parallelSort(app.data, pool);
         } else {
             sort(app.data);
         }
@@ -252,9 +253,10 @@ template relation(Args...) {
 
 @("shall create a Relation using the parallel sort strategy")
 unittest {
-    import std.algorithm;
+    import std.algorithm : map;
+
     Relation!(KVTuple!(int, int)) a;
-    a.__ctor!(ThreadStrategy.parallel)([kvTuple(1,2)].map!"a");
+    a.__ctor!(ThreadStrategy.parallel)([kvTuple(1,2)].map!"a", taskPool);
 }
 
 @("shall merge two relations")
@@ -366,7 +368,11 @@ struct IterationImpl(ThreadStrategy Kind) {
 
     /// Creates a new named variable associated with the iterative context.
     scope auto variable(T0, T1)(string s) {
-        auto v = new Variable!(KVTuple!(T0, T1), Kind)(s);
+        static if (Kind == ThreadStrategy.single) {
+            auto v = new Variable!(KVTuple!(T0, T1), Kind)(s);
+        } else {
+            auto v = new Variable!(KVTuple!(T0, T1), Kind)(s, tpool);
+        }
         variables ~= v;
         return v;
     }
@@ -376,7 +382,11 @@ struct IterationImpl(ThreadStrategy Kind) {
     /// This variable will not be maintained distinctly, and may advertise tuples as
     /// recent multiple times (perhaps unbounded many times).
     scope auto variableInDistinct(T0, T1)(string s) {
-        auto v = new Variable!(KVTuple!(T0, T1), Kind)(s);
+        static if (Kind == ThreadStrategy.single) {
+            auto v = new Variable!(KVTuple!(T0, T1), Kind)(s);
+        } else {
+            auto v = new Variable!(KVTuple!(T0, T1), Kind)(s, tpool);
+        }
         v.distinct = false;
         return v;
     }
@@ -417,6 +427,8 @@ interface VariableTrait {
 final class Variable(TupleT, ThreadStrategy TS = ThreadStrategy.single) : VariableTrait if (isTuple!TupleT) {
     import std.range : isInputRange, ElementType, isOutputRange;
 
+    TaskPool tpool;
+
     /// Convenient alias to retrieve the tuple type.
     alias TT = TupleT;
 
@@ -442,11 +454,24 @@ final class Variable(TupleT, ThreadStrategy TS = ThreadStrategy.single) : Variab
     /// A list of future tuples, to be introduced.
     Relation!TupleT[] toAdd;
 
-    this() {
+    static if (TS == ThreadStrategy.single) {
+        this() {
+        }
+
+        this(string name) {
+            this.name = name;
+        }
     }
 
-    this(string name) {
+    this(TaskPool tp) {
+        static if (TS == ThreadStrategy.parallel)
+            this.tpool = tp;
+    }
+
+    this(string name, TaskPool tp) {
         this.name = name;
+        static if (TS == ThreadStrategy.parallel)
+            this.tpool = tp;
     }
 
     /// Adds tuples that result from joining `input1` and `input2`.
