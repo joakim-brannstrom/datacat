@@ -84,7 +84,10 @@ struct Relation(TupleT) {
      * Params:
      *  other = the source to pull elements from.
      */
-    this(ThreadStrategy TS = ThreadStrategy.single, T, ARGS...)(T other, auto ref ARGS args) if (isInputRange!T && is(ElementType!T == TupleT) && (TS == ThreadStrategy.parallel && ARGS.length == 1 && is(ARGS[0] == TaskPool) || TS == ThreadStrategy.single)) {
+    this(ThreadStrategy TS = ThreadStrategy.single, T, ARGS...)(T other, auto ref ARGS args)
+            if (isInputRange!T && is(ElementType!T == TupleT)
+                && (TS == ThreadStrategy.parallel && ARGS.length == 1
+                && is(ARGS[0] == TaskPool) || TS == ThreadStrategy.single)) {
         import std.algorithm : copy, sort, until, uniq;
         import std.array : appender;
         import std.range : SortedRange, hasLength;
@@ -115,13 +118,15 @@ struct Relation(TupleT) {
                 // Partition the array.
                 swap(data[$ / 2], data[$ - 1]);
                 auto pivot = data[$ - 1];
-                bool lessThanPivot(T elem) { return elem < pivot; }
+                bool lessThanPivot(T elem) {
+                    return elem < pivot;
+                }
 
-                auto greaterEqual = partition!lessThanPivot(data[0..$ - 1]);
+                auto greaterEqual = partition!lessThanPivot(data[0 .. $ - 1]);
                 swap(data[$ - greaterEqual.length - 1], data[$ - 1]);
 
-                auto less = data[0..$ - greaterEqual.length - 1];
-                greaterEqual = data[$ - greaterEqual.length..$];
+                auto less = data[0 .. $ - greaterEqual.length - 1];
+                greaterEqual = data[$ - greaterEqual.length .. $];
 
                 // Execute both recursion branches in parallel.
                 auto recurseTask = task!parallelSort(greaterEqual, pool);
@@ -129,6 +134,7 @@ struct Relation(TupleT) {
                 parallelSort(less, pool);
                 recurseTask.yieldForce;
             }
+
             TaskPool pool = args[0];
             parallelSort(app.data, pool);
         } else {
@@ -258,7 +264,7 @@ unittest {
     import std.algorithm : map;
 
     Relation!(KVTuple!(int, int)) a;
-    a.__ctor!(ThreadStrategy.parallel)([kvTuple(1,2)].map!"a", taskPool);
+    a.__ctor!(ThreadStrategy.parallel)([kvTuple(1, 2)].map!"a", taskPool);
 }
 
 @("shall merge two relations")
@@ -426,6 +432,7 @@ interface VariableTrait {
 /// and it is important that any cycle of derivations have at least one de-duplicating
 /// variable on it.
 /// TODO: tuple should be constrainted to something with Key/Value.
+// dfmt off
 final class Variable(TupleT, ThreadStrategy TS = ThreadStrategy.single) : VariableTrait if (isTuple!TupleT) {
     import std.range : isInputRange, ElementType, isOutputRange;
 
@@ -702,6 +709,7 @@ final class Variable(TupleT, ThreadStrategy TS = ThreadStrategy.single) : Variab
                 stable, recent, toAdd);
     }
 }
+// dfmt on
 
 /// Create a Variable type with a tuple of the provided types (`Args`).
 template Variable(Args...) {

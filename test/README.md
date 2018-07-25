@@ -24,3 +24,13 @@ dub build --single make_graph_from_benchmark.d
 ```
 
 When make_graph_from_benchmark is executed it writes the graph to `profile_graph.png`.
+
+# Profile Graph
+
+I recommend using `profdump` to generate pretty graphs from the profiling data that DMD produces.
+
+```sh
+dub fetch profdump
+dub run profdump -- -d -f -t 1.0 ./trace.log trace.dot
+dot -Tsvg trace.dot -o trace.svg
+```
