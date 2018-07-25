@@ -13,7 +13,7 @@ import logger = std.experimental.logger;
 import std.traits;
 
 import datacat : Variable, Relation, hasKeyField, hasValueField,
-    hasKeyValueFields;
+    hasKeyValueFields, ThreadStrategy;
 
 // TODO: change Input1T and Input2T to KeyT, Val1T, Val2T.
 // Add condition that logicFn(ref Key, ref Val1, ref Val2)->Result
@@ -22,7 +22,7 @@ import datacat : Variable, Relation, hasKeyField, hasValueField,
  * Params:
  *  output = the result of the cross product between input1 and input2 by applying logicFn
  */
-void join(alias logicFn, Input1T, Input2T, OutputT)(Input1T input1, Input2T input2, OutputT output) {
+void join(alias logicFn, ThreadStrategy TS, Input1T, Input2T, OutputT)(Input1T input1, Input2T input2, OutputT output) {
     import std.array : appender;
 
     auto results = appender!(Input1T.TT[]);
@@ -39,11 +39,13 @@ void join(alias logicFn, Input1T, Input2T, OutputT)(Input1T input1, Input2T inpu
 
     joinHelper!fn(recent1, recent2);
 
-    output.insert(results.data.Relation!(Input1T.TT));
+    Relation!(Input1T.TT) rel;
+    rel.__ctor!(TS)(results.data);
+    output.insert(rel);
 }
 
 /// Moves all recent tuples from `input1` that are not present in `input2` into `output`.
-void antiJoin(alias logicFn, Input1T, Input2T, OutputT)(Input1T input1,
+void antiJoin(alias logicFn, ThreadStrategy TS, Input1T, Input2T, OutputT)(Input1T input1,
         Input2T input2, OutputT output) {
     import std.array : appender, empty;
 
@@ -56,7 +58,9 @@ void antiJoin(alias logicFn, Input1T, Input2T, OutputT)(Input1T input1,
             results.put(logicFn(kv.key, kv.value));
     }
 
-    output.insert(results.data.Relation!(Input1T.TT));
+    Relation!(OutputT.TT) rel;
+    rel.__ctor!(TS)(results.data);
+    output.insert(rel);
 }
 
 // TODO: add constraint for CmpT, Fn(&T)->bool

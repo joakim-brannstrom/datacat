@@ -58,7 +58,12 @@ struct Relation(TupleT) {
     TupleT[] elements;
     alias elements this;
 
-    static auto from(T)(T values) {
+    /** Convenient function to create a `Relation` from an array containing
+     * values with the length 2.
+     *
+     * Returns: a `Relation`.
+     */
+    static auto from(T, ThreadStrategy TS = ThreadStrategy.single)(T values) {
         import std.algorithm : map;
 
         static if (hasKeyValueFields!TupleT) {
@@ -79,7 +84,7 @@ struct Relation(TupleT) {
      * Params:
      *  other = the source to pull elements from.
      */
-    this(T)(T other) if (isInputRange!T && is(ElementType!T == TupleT)) {
+    this(ThreadStrategy TS = ThreadStrategy.single, T)(T other) if (isInputRange!T && is(ElementType!T == TupleT)) {
         import std.algorithm : copy, sort, until, uniq;
         import std.array : appender;
         import std.range : SortedRange, hasLength;
@@ -91,8 +96,41 @@ struct Relation(TupleT) {
 
         other.copy(app);
 
-        static if (!is(T : SortedRange!U, U))
+        static if (is(T : SortedRange!U, U)) {
+            // do nothing
+        } else static if (TS == ThreadStrategy.parallel) {
+            // code copied from std.parallelism
+            import std.parallelism;
+            import std.algorithm;
+
+            static void parallelSort(T)(T[] data) {
+                // Sort small subarrays serially.
+                if (data.length < 100) {
+                    std.algorithm.sort(data);
+                    return;
+                }
+
+                // Partition the array.
+                swap(data[$ / 2], data[$ - 1]);
+                auto pivot = data[$ - 1];
+                bool lessThanPivot(T elem) { return elem < pivot; }
+
+                auto greaterEqual = partition!lessThanPivot(data[0..$ - 1]);
+                swap(data[$ - greaterEqual.length - 1], data[$ - 1]);
+
+                auto less = data[0..$ - greaterEqual.length - 1];
+                greaterEqual = data[$ - greaterEqual.length..$];
+
+                // Execute both recursion branches in parallel.
+                auto recurseTask = task!parallelSort(greaterEqual);
+                taskPool.put(recurseTask);
+                parallelSort(less);
+                recurseTask.yieldForce;
+            }
+            parallelSort(app.data);
+        } else {
             sort(app.data);
+        }
 
         elements.length = app.data.length;
         elements.length -= app.data.uniq.copy(elements).length;
@@ -210,6 +248,13 @@ template relation(Args...) {
 
         static assert(0, "1 or 2 parameters required. " ~ Args.length.to!string ~ " provided");
     }
+}
+
+@("shall create a Relation using the parallel sort strategy")
+unittest {
+    import std.algorithm;
+    Relation!(KVTuple!(int, int)) a;
+    a.__ctor!(ThreadStrategy.parallel)([kvTuple(1,2)].map!"a");
 }
 
 @("shall merge two relations")
@@ -369,7 +414,7 @@ interface VariableTrait {
 /// and it is important that any cycle of derivations have at least one de-duplicating
 /// variable on it.
 /// TODO: tuple should be constrainted to something with Key/Value.
-final class Variable(TupleT, ThreadStrategy Kind = ThreadStrategy.single) : VariableTrait if (isTuple!TupleT) {
+final class Variable(TupleT, ThreadStrategy TS = ThreadStrategy.single) : VariableTrait if (isTuple!TupleT) {
     import std.range : isInputRange, ElementType, isOutputRange;
 
     /// Convenient alias to retrieve the tuple type.
@@ -430,7 +475,7 @@ final class Variable(TupleT, ThreadStrategy Kind = ThreadStrategy.single) : Vari
     void fromJoin(alias Fn, Input1T, Input2T)(Input1T input1, Input2T input2) {
         import datacat.join;
 
-        join!Fn(input1, input2, this);
+        join!(Fn, TS)(input1, input2, this);
     }
 
     /// Adds tuples from `input1` whose key is not present in `input2`.
@@ -460,7 +505,7 @@ final class Variable(TupleT, ThreadStrategy Kind = ThreadStrategy.single) : Vari
     void fromAntiJoin(alias Fn, Input1T, Input2T)(Input1T input1, Input2T input2) {
         import datacat.join;
 
-        antiJoin!Fn(input1, input2, this);
+        antiJoin!(Fn, TS)(input1, input2, this);
     }
 
     /// Adds tuples that result from mapping `input`.
@@ -495,7 +540,7 @@ final class Variable(TupleT, ThreadStrategy Kind = ThreadStrategy.single) : Vari
     void fromMap(alias Fn, Input1T)(Input1T input) {
         import datacat.map;
 
-        mapInto!Fn(input, this);
+        mapInto!(Fn, TS)(input, this);
     }
 
     /// Inserts a relation into the variable.
