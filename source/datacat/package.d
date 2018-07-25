@@ -30,6 +30,8 @@ version (unittest) {
     import unit_threaded;
 }
 
+@safe:
+
 alias KVTuple(K, V) = Tuple!(K, "key", V, "value");
 alias KVTuple(K) = Tuple!(K, "key");
 
@@ -103,7 +105,7 @@ struct Relation(TupleT) {
             // do nothing
         } else static if (TS == ThreadStrategy.parallel) {
             // code copied from std.parallelism
-            static void parallelSort(T)(T[] data, TaskPool pool) {
+            static void parallelSort(T)(T[] data, TaskPool pool) @safe {
                 import std.parallelism : task;
                 import std.algorithm : swap, partition;
 
