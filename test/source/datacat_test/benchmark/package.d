@@ -52,7 +52,7 @@ void perf_parallel_join() {
 
         Variable!(KVTuple!(int, int), Kind)[] vars;
 
-        foreach (i; 0 .. 100) {
+        foreach (i; 0 .. 10) {
             vars ~= iter.variable!(int, int)("source");
             vars[$-1].insert(relation!(int, int).from(iota(100).map!(x => tuple(x, x + 1))));
             vars[$-1].insert(relation!(int, int).from(iota(100).map!(x => tuple(x + 1, x))));
