@@ -24,7 +24,8 @@ import datacat : Relation, ThreadStrategy;
  * Params:
  *  output = the result of the join
  */
-void join(alias logicFn, ThreadStrategy TS, Input1T, Input2T, OutputT)(Input1T input1, Input2T input2, OutputT output) {
+void join(alias logicFn, ThreadStrategy TS, Input1T, Input2T, OutputT)(
+        Input1T input1, Input2T input2, OutputT output) {
     import std.array : appender;
 
     auto results = appender!(Input1T.TT[]);
@@ -56,8 +57,8 @@ void join(alias logicFn, ThreadStrategy TS, Input1T, Input2T, OutputT)(Input1T i
  * Params:
  *  output = the result of the join
  */
-void antiJoin(alias logicFn, ThreadStrategy TS, Input1T, Input2T, OutputT)(Input1T input1,
-        Input2T input2, OutputT output) {
+void antiJoin(alias logicFn, ThreadStrategy TS, Input1T, Input2T, OutputT)(
+        Input1T input1, Input2T input2, OutputT output) {
     import std.array : appender, empty;
 
     auto results = appender!(Input1T.TT[]);
