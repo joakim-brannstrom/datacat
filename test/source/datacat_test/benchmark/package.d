@@ -13,6 +13,7 @@ import std.algorithm : map, filter;
 import std.array : array;
 import std.range : iota;
 import std.traits : ReturnType;
+import std.typecons : tuple;
 
 import datacat;
 import datacat_test.common;
@@ -54,8 +55,8 @@ void perf_parallel_join() {
 
         foreach (i; 0 .. 10) {
             vars ~= iter.variable!(int, int)("source");
-            vars[$-1].insert(relation!(int, int).from(iota(100).map!(x => tuple(x, x + 1))));
-            vars[$-1].insert(relation!(int, int).from(iota(100).map!(x => tuple(x + 1, x))));
+            vars[$ - 1].insert(relation!(int, int).from(iota(100).map!(x => tuple(x, x + 1))));
+            vars[$ - 1].insert(relation!(int, int).from(iota(100).map!(x => tuple(x + 1, x))));
         }
 
         // act

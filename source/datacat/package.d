@@ -23,12 +23,12 @@ import std.traits : hasMember;
 import std.typecons : Tuple;
 import std.parallelism : TaskPool, taskPool;
 
-public import std.typecons : tuple;
-
-public import datacat.join;
 public import datacat.range;
 
-version (unittest) import unit_threaded;
+version (unittest) {
+    import std.typecons : tuple;
+    import unit_threaded;
+}
 
 alias KVTuple(K, V) = Tuple!(K, "key", V, "value");
 alias KVTuple(K) = Tuple!(K, "key");
