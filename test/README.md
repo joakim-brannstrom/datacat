@@ -6,6 +6,13 @@ There is a markedly difference between debug build and release. The performance 
 dub build --compiler=ldc2 -b release && ./build/datacat_benchmark
 ```
 
+The standalone applications should be built in a similare way.
+
+To run with profiling:
+```sh
+dub build --compiler=dmd -b utProf
+```
+
 # Graph
 
 The performance data is gathered in ".csv". These can be visualized as a graph with the `make_graph_from_benchmark.d` program.
