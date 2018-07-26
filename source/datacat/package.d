@@ -483,36 +483,6 @@ final class Variable(TupleT, ThreadStrategy TS = ThreadStrategy.single) : Variab
             this.taskPool = tp;
     }
 
-    /// Adds tuples from `input1` whose key is not present in `input2`.
-    ///
-    /// # Examples
-    ///
-    /// This example starts a collection with the pairs (x, x+1) for x in 0 .. 10. It then
-    /// adds any pairs (x+1,x) for which x is not a multiple of three. That excludes four
-    /// pairs (for 0, 3, 6, and 9) which should leave us with 16 total pairs.
-    ///
-    /// ```
-    /// use datafrog::{Iteration, Relation};
-    ///
-    /// let mut iteration = Iteration::new();
-    /// let variable = iteration.variable::<(usize, usize)>("source");
-    /// variable.insert(Relation::from((0 .. 10).map(|x| (x, x + 1))));
-    ///
-    /// let relation = Relation::from((0 .. 10).filter(|x| x % 3 == 0));
-    ///
-    /// while iteration.changed() {
-    ///     variable.from_antijoin(&variable, &relation, |&key, &val| (val, key));
-    /// }
-    ///
-    /// let result = variable.complete();
-    /// assert_eq!(result.len(), 16);
-    /// ```
-    void fromAntiJoin(alias Fn, Input1T, Input2T)(Input1T input1, Input2T input2) {
-        import datacat.join;
-
-        antiJoin!(Fn, TS)(input1, input2, this);
-    }
-
     /// Adds tuples that result from mapping `input`.
     ///
     /// # Examples
@@ -725,6 +695,40 @@ template fromJoin(Args...) if (Args.length == 1) {
     }
 }
 
+/// Adds tuples from `input1` whose key is not present in `input2`.
+///
+/// # Examples
+///
+/// This example starts a collection with the pairs (x, x+1) for x in 0 .. 10. It then
+/// adds any pairs (x+1,x) for which x is not a multiple of three. That excludes four
+/// pairs (for 0, 3, 6, and 9) which should leave us with 16 total pairs.
+///
+/// ```
+/// use datafrog::{Iteration, Relation};
+///
+/// let mut iteration = Iteration::new();
+/// let variable = iteration.variable::<(usize, usize)>("source");
+/// variable.insert(Relation::from((0 .. 10).map(|x| (x, x + 1))));
+///
+/// let relation = Relation::from((0 .. 10).filter(|x| x % 3 == 0));
+///
+/// while iteration.changed() {
+///     variable.from_antijoin(&variable, &relation, |&key, &val| (val, key));
+/// }
+///
+/// let result = variable.complete();
+/// assert_eq!(result.len(), 16);
+/// ```
+template fromAntiJoin(Args...) if (Args.length == 1) {
+    auto fromAntiJoin(Self, I1, I2)(Self self, I1 i1, I2 i2) {
+        import std.functional : unaryFun;
+        static import datacat.join;
+
+        alias fn_ = unaryFun!(Args[0]);
+        return datacat.join.antiJoin!(fn_, Self.ThisTS)(i1, i2, self);
+    }
+}
+
 /// Create a Variable type with a tuple of the provided types (`Args`).
 template Variable(Args...) {
     import std.typecons : Tuple;
@@ -834,11 +838,7 @@ unittest {
 
     // act
     while (iter.changed) {
-        static auto helper(T0, T1)(T0 k, T1 v) {
-            return kvTuple(v, k);
-        }
-
-        variable.fromAntiJoin!(helper)(variable, relation_);
+        variable.fromAntiJoin!((k, v) => kvTuple(v, k))(variable, relation_);
     }
 
     auto result = variable.complete;
