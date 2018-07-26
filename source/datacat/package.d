@@ -495,8 +495,12 @@ final class Variable(TupleT, ThreadStrategy TS = ThreadStrategy.single) : Variab
 
     /// ditto
     void insert(T)(T relation) if (is(T : TupleT[]) || isInputRange!T && is(ElementType!T == TupleT)) {
-        if (relation.length == 0)
-            return;
+        import std.range : hasLength;
+
+        static if (hasLength!T) {
+            if (relation.length == 0)
+                return;
+        }
 
         Relation!TupleT rel;
         static if (TS == ThreadStrategy.parallel)
