@@ -12,7 +12,10 @@ module datacat.join;
 import logger = std.experimental.logger;
 import std.traits : hasMember;
 
-import datacat : Relation, ThreadStrategy;
+version (unittest) {
+    import unit_threaded;
+    import datacat : Relation, Iteration, kvTuple, relation;
+}
 
 // TODO: change Input1T and Input2T to KeyT, Val1T, Val2T.
 // Add condition that logicFn(ref Key, ref Val1, ref Val2)->Result
@@ -24,11 +27,11 @@ import datacat : Relation, ThreadStrategy;
  * Params:
  *  output = the result of the join
  */
-void join(alias logicFn, ThreadStrategy TS, Input1T, Input2T, OutputT)(
-        Input1T input1, Input2T input2, OutputT output) {
+private void join(alias logicFn, Input1T, Input2T, OutputT)(Input1T input1,
+        Input2T input2, OutputT output) {
     import std.array : appender;
 
-    auto results = appender!(Input1T.TT[]);
+    auto results = appender!(OutputT.TT[]);
 
     alias fn = (k, v1, v2) { return results.put(logicFn(k, v1, v2)); };
 
@@ -42,12 +45,49 @@ void join(alias logicFn, ThreadStrategy TS, Input1T, Input2T, OutputT)(
 
     joinHelper!fn(recent1, recent2);
 
-    Relation!(OutputT.TT) rel;
-    static if (hasMember!(OutputT, "taskPool"))
-        rel.__ctor!(TS)(results.data, output.taskPool);
-    else
-        static assert(0, "output (" ~ OutputT.stringof ~ ") has no member taskPool");
-    output.insert(rel);
+    output.insert(results.data);
+}
+
+/** Adds tuples that result from joining `input1` and `input2`.
+ */
+template fromJoin(Args...) if (Args.length == 1) {
+    auto fromJoin(Self, I1, I2)(Self self, I1 i1, I2 i2) {
+        import std.functional : unaryFun;
+
+        alias fn_ = unaryFun!(Args[0]);
+        return join!(fn_)(i1, i2, self);
+    }
+}
+
+/**
+ * This example starts a collection with the pairs (x, x+1) and (x+1, x) for x in 0 .. 10.
+ * It then adds pairs (y, z) for which (x, y) and (x, z) are present. Because the initial
+ * pairs are symmetric, this should result in all pairs (x, y) for x and y in 0 .. 11.
+ */
+@("shall join two variables to produce all pairs (x,y) in the provided range")
+unittest {
+    import std.algorithm : map;
+    import std.range : iota;
+
+    // arrange
+    Iteration iter;
+    auto variable = iter.variable!(int, int)("source");
+    variable.insert(iota(3).map!(x => kvTuple(x, x + 1)));
+    // [[0,1],[1,2],[2,3],]
+    variable.insert(iota(3).map!(x => kvTuple(x + 1, x)));
+    // [[1,0],[2,1],[3,2],]
+
+    // act
+    while (iter.changed) {
+        variable.fromJoin!((k, v1, v2) => kvTuple(v1, v2))(variable, variable);
+    }
+
+    auto result = variable.complete;
+
+    // assert
+    result.should == [[0, 0], [0, 1], [0, 2], [0, 3], [1, 0], [1, 1], [1, 2],
+        [1, 3], [2, 0], [2, 1], [2, 2], [2, 3], [3, 0], [3, 1], [3, 2], [3, 3]].map!(
+            a => kvTuple(a[0], a[1]));
 }
 
 /** Moves all recent tuples from `input1` that are not present in `input2` into `output`.
@@ -57,11 +97,11 @@ void join(alias logicFn, ThreadStrategy TS, Input1T, Input2T, OutputT)(
  * Params:
  *  output = the result of the join
  */
-void antiJoin(alias logicFn, ThreadStrategy TS, Input1T, Input2T, OutputT)(
-        Input1T input1, Input2T input2, OutputT output) {
+private void antiJoin(alias logicFn, Input1T, Input2T, OutputT)(Input1T input1,
+        Input2T input2, OutputT output) {
     import std.array : appender, empty;
 
-    auto results = appender!(Input1T.TT[]);
+    auto results = appender!(OutputT.TT[]);
     auto tuples2 = input2[];
 
     foreach (kv; input1.recent) {
@@ -70,12 +110,50 @@ void antiJoin(alias logicFn, ThreadStrategy TS, Input1T, Input2T, OutputT)(
             results.put(logicFn(kv.key, kv.value));
     }
 
-    Relation!(OutputT.TT) rel;
-    static if (hasMember!(OutputT, "taskPool"))
-        rel.__ctor!(TS)(results.data, output.taskPool);
-    else
-        static assert(0, "output (" ~ OutputT.stringof ~ ") has no member taskPool");
-    output.insert(rel);
+    output.insert(results.data);
+}
+
+/** Adds tuples from `input1` whose key is not present in `input2`.
+ */
+template fromAntiJoin(Args...) if (Args.length == 1) {
+    auto fromAntiJoin(Self, I1, I2)(Self self, I1 i1, I2 i2) {
+        import std.functional : unaryFun;
+
+        alias fn_ = unaryFun!(Args[0]);
+        return antiJoin!(fn_)(i1, i2, self);
+    }
+}
+
+/**
+ * This example starts a collection with the pairs (x, x+1) for x in 0 .. 10. It then
+ * adds any pairs (x+1,x) for which x is not a multiple of three. That excludes four
+ * pairs (for 0, 3, 6, and 9) which should leave us with 16 total pairs.
+ */
+@("shall anti-join two variables to produce only those pairs that are not multiples of 3")
+unittest {
+    import std.algorithm : map, filter;
+    import std.range : iota;
+
+    // arrange
+    Iteration iter;
+    auto variable = iter.variable!(int, int)("source");
+    variable.insert(iota(10).map!(x => kvTuple(x, x + 1)));
+    auto relation_ = relation!(int).from(iota(10).filter!(x => x % 3 == 0)
+            .map!kvTuple);
+
+    // act
+    while (iter.changed) {
+        variable.fromAntiJoin!((k, v) => kvTuple(v, k))(variable, relation_);
+    }
+
+    auto result = variable.complete;
+
+    // assert
+    result.should == relation!(int, int).from([[0, 1], [1, 2], [2, 1], [2, 3],
+            [3, 2], [3, 4], [4, 5], [5, 4], [5, 6], [6, 5], [6, 7], [7, 8], [8,
+            7], [8, 9], [9, 8], [9, 10],]);
+    //.map!(a => kvTuple(a[0], a[1]));
+    result.length.should == 16;
 }
 
 // TODO: add constraint for CmpT, Fn(&T)->bool
