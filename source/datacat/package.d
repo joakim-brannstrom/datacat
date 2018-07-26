@@ -1,11 +1,9 @@
 /**
 Copyright: Copyright (c) 2018 Frank McSherry
-License: MIT
+License: APACHE-2.0
 Author: Joakim BrännströmJoakim Brännström (joakim.brannstrom@gmx.com)
 
-Port of DataFrog to D.
-
-A lightweight Datalog engine in Rust
+Port of DataFrog (Datalog engine in Rust) to D.
 
 The intended design is that one has static `Relation` types that are sets of
 tuples, and `Variable` types that represent monotonically increasing sets of
