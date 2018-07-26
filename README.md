@@ -80,16 +80,19 @@ It is the file at "Graphs/Apache Httpd 2.2.18 Dataflow/http_df".
 cd datafrog
 cargo build --release
 ./target/release/graspan1 ~/httpd_df
-Duration { secs: 1, nanos: 531828020 }  Data loaded
-Duration { secs: 4, nanos: 86972216 }   Computation complete (nodes_final: 9393283)
+Duration { secs: 1, nanos: 538892450 }  Data loaded
+Duration { secs: 4, nanos: 106084073 }  Computation complete (nodes_final: 9393283)
 
 # ----
 cd datacat/test/standalone
 dub build --compiler=ldc2 -b release
 ./build/graspan1 ~/httpd_df
 Shall calculate the dataflow from the provided file
-1 sec, 818 ms, and 891 μs: Data loaded
-3 secs, 488 ms, 353 μs, and 1 hnsec: Computation complete (nodes_final: 9393283)
+1 sec, 784 ms, 24 μs, and 8 hnsecs: Data loaded
+Single threaded
+3 secs, 383 ms, 906 μs, and 4 hnsecs: Computation complete (nodes_final: 9393283)
+Multi threaded
+2 secs, 286 ms, 703 μs, and 4 hnsecs: Computation complete (nodes_final: 9393283)
 ```
 
 # Credit
