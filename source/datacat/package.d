@@ -483,41 +483,6 @@ final class Variable(TupleT, ThreadStrategy TS = ThreadStrategy.single) : Variab
             this.taskPool = tp;
     }
 
-    /// Adds tuples that result from mapping `input`.
-    ///
-    /// # Examples
-    ///
-    /// This example starts a collection with the pairs (x, x) for x in 0 .. 10. It then
-    /// repeatedly adds any pairs (x, z) for (x, y) in the collection, where z is the Collatz
-    /// step for y: it is y/2 if y is even, and 3*y + 1 if y is odd. This produces all of the
-    /// pairs (x, y) where x visits y as part of its Collatz journey.
-    ///
-    /// ```
-    /// use datafrog::{Iteration, Relation};
-    ///
-    /// let mut iteration = Iteration::new();
-    /// let variable = iteration.variable::<(usize, usize)>("source");
-    /// variable.insert(Relation::from((0 .. 10).map(|x| (x, x))));
-    ///
-    /// while iteration.changed() {
-    ///     variable.from_map(&variable, |&(key, val)|
-    ///         if val % 2 == 0 {
-    ///             (key, val/2)
-    ///         }
-    ///         else {
-    ///             (key, 3*val + 1)
-    ///         });
-    /// }
-    ///
-    /// let result = variable.complete();
-    /// assert_eq!(result.len(), 74);
-    /// ```
-    void fromMap(alias Fn, Input1T)(Input1T input) {
-        import datacat.map;
-
-        mapInto!(Fn, TS)(input, this);
-    }
-
     /// Inserts a relation into the variable.
     ///
     /// This is most commonly used to load initial values into a variable.
@@ -729,6 +694,45 @@ template fromAntiJoin(Args...) if (Args.length == 1) {
     }
 }
 
+/// Adds tuples that result from mapping `input`.
+///
+/// # Examples
+///
+/// This example starts a collection with the pairs (x, x) for x in 0 .. 10. It then
+/// repeatedly adds any pairs (x, z) for (x, y) in the collection, where z is the Collatz
+/// step for y: it is y/2 if y is even, and 3*y + 1 if y is odd. This produces all of the
+/// pairs (x, y) where x visits y as part of its Collatz journey.
+///
+/// ```
+/// use datafrog::{Iteration, Relation};
+///
+/// let mut iteration = Iteration::new();
+/// let variable = iteration.variable::<(usize, usize)>("source");
+/// variable.insert(Relation::from((0 .. 10).map(|x| (x, x))));
+///
+/// while iteration.changed() {
+///     variable.from_map(&variable, |&(key, val)|
+///         if val % 2 == 0 {
+///             (key, val/2)
+///         }
+///         else {
+///             (key, 3*val + 1)
+///         });
+/// }
+///
+/// let result = variable.complete();
+/// assert_eq!(result.len(), 74);
+/// ```
+template fromMap(Args...) if (Args.length == 1) {
+    auto fromMap(Self, I1)(Self self, I1 i1) {
+        import std.functional : unaryFun;
+        static import datacat.map;
+
+        alias fn_ = unaryFun!(Args[0]);
+        return datacat.map.mapInto!(fn_, Self.ThisTS)(i1, self);
+    }
+}
+
 /// Create a Variable type with a tuple of the provided types (`Args`).
 template Variable(Args...) {
     import std.typecons : Tuple;
@@ -863,14 +867,8 @@ unittest {
 
     // act
     while (iter.changed) {
-        static auto helper(KV)(KV a) {
-            if (a.value % 2 == 0)
-                return kvTuple(a.key, a.value / 2);
-            else
-                return kvTuple(a.key, 3 * a.value + 1);
-        }
-
-        variable.fromMap!(helper)(variable);
+        variable.fromMap!((a) => a.value % 2 == 0 ? kvTuple(a.key, a.value / 2)
+                : kvTuple(a.key, 3 * a.value + 1))(variable);
     }
 
     auto result = variable.complete;
