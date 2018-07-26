@@ -627,29 +627,8 @@ final class Variable(TupleT, ThreadStrategy TS = ThreadStrategy.single) : Variab
 }
 // dfmt on
 
-/// Adds tuples that result from joining `input1` and `input2`.
-///
-/// # Examples
-///
-/// This example starts a collection with the pairs (x, x+1) and (x+1, x) for x in 0 .. 10.
-/// It then adds pairs (y, z) for which (x, y) and (x, z) are present. Because the initial
-/// pairs are symmetric, this should result in all pairs (x, y) for x and y in 0 .. 11.
-///
-/// ```
-/// use datafrog::{Iteration, Relation};
-///
-/// let mut iteration = Iteration::new();
-/// let variable = iteration.variable::<(usize, usize)>("source");
-/// variable.insert(Relation::from((0 .. 10).map(|x| (x, x + 1))));
-/// variable.insert(Relation::from((0 .. 10).map(|x| (x + 1, x))));
-///
-/// while iteration.changed() {
-///     variable.from_join(&variable, &variable, |&key, &val1, &val2| (val1, val2));
-/// }
-///
-/// let result = variable.complete();
-/// assert_eq!(result.len(), 121);
-/// ```
+/** Adds tuples that result from joining `input1` and `input2`.
+ */
 template fromJoin(Args...) if (Args.length == 1) {
     auto fromJoin(Self, I1, I2)(Self self, I1 i1, I2 i2) {
         import std.functional : unaryFun;
@@ -660,30 +639,39 @@ template fromJoin(Args...) if (Args.length == 1) {
     }
 }
 
-/// Adds tuples from `input1` whose key is not present in `input2`.
-///
-/// # Examples
-///
-/// This example starts a collection with the pairs (x, x+1) for x in 0 .. 10. It then
-/// adds any pairs (x+1,x) for which x is not a multiple of three. That excludes four
-/// pairs (for 0, 3, 6, and 9) which should leave us with 16 total pairs.
-///
-/// ```
-/// use datafrog::{Iteration, Relation};
-///
-/// let mut iteration = Iteration::new();
-/// let variable = iteration.variable::<(usize, usize)>("source");
-/// variable.insert(Relation::from((0 .. 10).map(|x| (x, x + 1))));
-///
-/// let relation = Relation::from((0 .. 10).filter(|x| x % 3 == 0));
-///
-/// while iteration.changed() {
-///     variable.from_antijoin(&variable, &relation, |&key, &val| (val, key));
-/// }
-///
-/// let result = variable.complete();
-/// assert_eq!(result.len(), 16);
-/// ```
+/**
+ * This example starts a collection with the pairs (x, x+1) and (x+1, x) for x in 0 .. 10.
+ * It then adds pairs (y, z) for which (x, y) and (x, z) are present. Because the initial
+ * pairs are symmetric, this should result in all pairs (x, y) for x and y in 0 .. 11.
+ */
+@("shall join two variables to produce all pairs (x,y) in the provided range")
+unittest {
+    import std.algorithm : map;
+    import std.range : iota;
+
+    // arrange
+    Iteration iter;
+    auto variable = iter.variable!(int, int)("source");
+    variable.insert(iota(3).map!(x => kvTuple(x, x + 1)));
+    // [[0,1],[1,2],[2,3],]
+    variable.insert(iota(3).map!(x => kvTuple(x + 1, x)));
+    // [[1,0],[2,1],[3,2],]
+
+    // act
+    while (iter.changed) {
+        variable.fromJoin!((k, v1, v2) => kvTuple(v1, v2))(variable, variable);
+    }
+
+    auto result = variable.complete;
+
+    // assert
+    result.should == [[0, 0], [0, 1], [0, 2], [0, 3], [1, 0], [1, 1], [1, 2],
+        [1, 3], [2, 0], [2, 1], [2, 2], [2, 3], [3, 0], [3, 1], [3, 2], [3, 3]].map!(
+            a => kvTuple(a[0], a[1]));
+}
+
+/** Adds tuples from `input1` whose key is not present in `input2`.
+ */
 template fromAntiJoin(Args...) if (Args.length == 1) {
     auto fromAntiJoin(Self, I1, I2)(Self self, I1 i1, I2 i2) {
         import std.functional : unaryFun;
@@ -694,35 +682,40 @@ template fromAntiJoin(Args...) if (Args.length == 1) {
     }
 }
 
-/// Adds tuples that result from mapping `input`.
-///
-/// # Examples
-///
-/// This example starts a collection with the pairs (x, x) for x in 0 .. 10. It then
-/// repeatedly adds any pairs (x, z) for (x, y) in the collection, where z is the Collatz
-/// step for y: it is y/2 if y is even, and 3*y + 1 if y is odd. This produces all of the
-/// pairs (x, y) where x visits y as part of its Collatz journey.
-///
-/// ```
-/// use datafrog::{Iteration, Relation};
-///
-/// let mut iteration = Iteration::new();
-/// let variable = iteration.variable::<(usize, usize)>("source");
-/// variable.insert(Relation::from((0 .. 10).map(|x| (x, x))));
-///
-/// while iteration.changed() {
-///     variable.from_map(&variable, |&(key, val)|
-///         if val % 2 == 0 {
-///             (key, val/2)
-///         }
-///         else {
-///             (key, 3*val + 1)
-///         });
-/// }
-///
-/// let result = variable.complete();
-/// assert_eq!(result.len(), 74);
-/// ```
+/**
+ * This example starts a collection with the pairs (x, x+1) for x in 0 .. 10. It then
+ * adds any pairs (x+1,x) for which x is not a multiple of three. That excludes four
+ * pairs (for 0, 3, 6, and 9) which should leave us with 16 total pairs.
+ */
+@("shall anti-join two variables to produce only those pairs that are not multiples of 3")
+unittest {
+    import std.algorithm : map, filter;
+    import std.range : iota;
+
+    // arrange
+    Iteration iter;
+    auto variable = iter.variable!(int, int)("source");
+    variable.insert(iota(10).map!(x => kvTuple(x, x + 1)));
+    auto relation_ = relation!(int).from(iota(10).filter!(x => x % 3 == 0)
+            .map!kvTuple);
+
+    // act
+    while (iter.changed) {
+        variable.fromAntiJoin!((k, v) => kvTuple(v, k))(variable, relation_);
+    }
+
+    auto result = variable.complete;
+
+    // assert
+    result.should == relation!(int, int).from([[0, 1], [1, 2], [2, 1], [2, 3],
+            [3, 2], [3, 4], [4, 5], [5, 4], [5, 6], [6, 5], [6, 7], [7, 8], [8,
+            7], [8, 9], [9, 8], [9, 10],]);
+    //.map!(a => kvTuple(a[0], a[1]));
+    result.length.should == 16;
+}
+
+/** Adds tuples that result from mapping `input`.
+ */
 template fromMap(Args...) if (Args.length == 1) {
     auto fromMap(Self, I1)(Self self, I1 i1) {
         import std.functional : unaryFun;
@@ -731,6 +724,34 @@ template fromMap(Args...) if (Args.length == 1) {
         alias fn_ = unaryFun!(Args[0]);
         return datacat.map.mapInto!(fn_, Self.ThisTS)(i1, self);
     }
+}
+
+/**
+ * This example starts a collection with the pairs (x, x) for x in 0 .. 10. It then
+ * repeatedly adds any pairs (x, z) for (x, y) in the collection, where z is the Collatz
+ * step for y: it is y/2 if y is even, and 3*y + 1 if y is odd. This produces all of the
+ * pairs (x, y) where x visits y as part of its Collatz journey.
+ */
+@("shall be the tuples that result from applying a function on the input")
+unittest {
+    import std.algorithm : map, filter;
+    import std.range : iota;
+
+    // arrange
+    Iteration iter;
+    auto variable = iter.variable!(int, int)("source");
+    variable.insert(iota(10).map!(x => kvTuple(x, x)));
+
+    // act
+    while (iter.changed) {
+        variable.fromMap!((a) => a.value % 2 == 0 ? kvTuple(a.key, a.value / 2)
+                : kvTuple(a.key, 3 * a.value + 1))(variable);
+    }
+
+    auto result = variable.complete;
+
+    // assert
+    result.length.should == 74;
 }
 
 /// Create a Variable type with a tuple of the provided types (`Args`).
@@ -800,81 +821,6 @@ unittest {
     a.toAdd.empty.should == true;
     a.recent.empty.should == true;
     a.stable.empty.should == false;
-}
-
-@("shall join two variables to produce all pairs (x,y) in the provided range")
-unittest {
-    import std.algorithm : map;
-    import std.range : iota;
-
-    // arrange
-    Iteration iter;
-    auto variable = iter.variable!(int, int)("source");
-    variable.insert(iota(3).map!(x => kvTuple(x, x + 1)));
-    // [[0,1],[1,2],[2,3],]
-    variable.insert(iota(3).map!(x => kvTuple(x + 1, x)));
-    // [[1,0],[2,1],[3,2],]
-
-    // act
-    while (iter.changed) {
-        variable.fromJoin!((k, v1, v2) => kvTuple(v1, v2))(variable, variable);
-    }
-
-    auto result = variable.complete;
-
-    // assert
-    result.should == [[0, 0], [0, 1], [0, 2], [0, 3], [1, 0], [1, 1], [1, 2],
-        [1, 3], [2, 0], [2, 1], [2, 2], [2, 3], [3, 0], [3, 1], [3, 2], [3, 3]].map!(
-            a => kvTuple(a[0], a[1]));
-}
-
-@("shall anti-join two variables to produce only those pairs that are not multiples of 3")
-unittest {
-    import std.algorithm : map, filter;
-    import std.range : iota;
-
-    // arrange
-    Iteration iter;
-    auto variable = iter.variable!(int, int)("source");
-    variable.insert(iota(10).map!(x => kvTuple(x, x + 1)));
-    auto relation_ = relation!(int).from(iota(10).filter!(x => x % 3 == 0)
-            .map!kvTuple);
-
-    // act
-    while (iter.changed) {
-        variable.fromAntiJoin!((k, v) => kvTuple(v, k))(variable, relation_);
-    }
-
-    auto result = variable.complete;
-
-    // assert
-    result.should == relation!(int, int).from([[0, 1], [1, 2], [2, 1], [2, 3],
-            [3, 2], [3, 4], [4, 5], [5, 4], [5, 6], [6, 5], [6, 7], [7, 8], [8,
-            7], [8, 9], [9, 8], [9, 10],]);
-    //.map!(a => kvTuple(a[0], a[1]));
-    result.length.should == 16;
-}
-
-@("shall be the tuples that result from applying a function on the input")
-unittest {
-    import std.algorithm : map, filter;
-    import std.range : iota;
-
-    // arrange
-    Iteration iter;
-    auto variable = iter.variable!(int, int)("source");
-    variable.insert(iota(10).map!(x => kvTuple(x, x)));
-
-    // act
-    while (iter.changed) {
-        variable.fromMap!((a) => a.value % 2 == 0 ? kvTuple(a.key, a.value / 2)
-                : kvTuple(a.key, 3 * a.value + 1))(variable);
-    }
-
-    auto result = variable.complete;
-
-    // assert
-    result.length.should == 74;
 }
 
 @("shall be chunks in stable that have a size about 2x of recent")
