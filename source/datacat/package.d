@@ -438,10 +438,10 @@ final class Variable(TupleT, ThreadStrategy TS = ThreadStrategy.single) : Variab
 
     TaskPool taskPool;
 
-    /// Convenient alias to retrieve the tuple type.
+    /// Convenient aliases to retrieve properties about the variable
     alias TT = TupleT;
-
     alias This = typeof(this);
+    alias ThisTS = TS;
 
     version (unittest) {
         /// Used for testing purpose to ensure both paths produce the same result.
@@ -481,35 +481,6 @@ final class Variable(TupleT, ThreadStrategy TS = ThreadStrategy.single) : Variab
         this.name = name;
         static if (TS == ThreadStrategy.parallel)
             this.taskPool = tp;
-    }
-
-    /// Adds tuples that result from joining `input1` and `input2`.
-    ///
-    /// # Examples
-    ///
-    /// This example starts a collection with the pairs (x, x+1) and (x+1, x) for x in 0 .. 10.
-    /// It then adds pairs (y, z) for which (x, y) and (x, z) are present. Because the initial
-    /// pairs are symmetric, this should result in all pairs (x, y) for x and y in 0 .. 11.
-    ///
-    /// ```
-    /// use datafrog::{Iteration, Relation};
-    ///
-    /// let mut iteration = Iteration::new();
-    /// let variable = iteration.variable::<(usize, usize)>("source");
-    /// variable.insert(Relation::from((0 .. 10).map(|x| (x, x + 1))));
-    /// variable.insert(Relation::from((0 .. 10).map(|x| (x + 1, x))));
-    ///
-    /// while iteration.changed() {
-    ///     variable.from_join(&variable, &variable, |&key, &val1, &val2| (val1, val2));
-    /// }
-    ///
-    /// let result = variable.complete();
-    /// assert_eq!(result.len(), 121);
-    /// ```
-    void fromJoin(alias Fn, Input1T, Input2T)(Input1T input1, Input2T input2) {
-        import datacat.join;
-
-        join!(Fn, TS)(input1, input2, this);
     }
 
     /// Adds tuples from `input1` whose key is not present in `input2`.
@@ -721,6 +692,39 @@ final class Variable(TupleT, ThreadStrategy TS = ThreadStrategy.single) : Variab
 }
 // dfmt on
 
+/// Adds tuples that result from joining `input1` and `input2`.
+///
+/// # Examples
+///
+/// This example starts a collection with the pairs (x, x+1) and (x+1, x) for x in 0 .. 10.
+/// It then adds pairs (y, z) for which (x, y) and (x, z) are present. Because the initial
+/// pairs are symmetric, this should result in all pairs (x, y) for x and y in 0 .. 11.
+///
+/// ```
+/// use datafrog::{Iteration, Relation};
+///
+/// let mut iteration = Iteration::new();
+/// let variable = iteration.variable::<(usize, usize)>("source");
+/// variable.insert(Relation::from((0 .. 10).map(|x| (x, x + 1))));
+/// variable.insert(Relation::from((0 .. 10).map(|x| (x + 1, x))));
+///
+/// while iteration.changed() {
+///     variable.from_join(&variable, &variable, |&key, &val1, &val2| (val1, val2));
+/// }
+///
+/// let result = variable.complete();
+/// assert_eq!(result.len(), 121);
+/// ```
+template fromJoin(Args...) if (Args.length == 1) {
+    auto fromJoin(Self, I1, I2)(Self self, I1 i1, I2 i2) {
+        import std.functional : unaryFun;
+        static import datacat.join;
+
+        alias fn_ = unaryFun!(Args[0]);
+        return datacat.join.join!(fn_, Self.ThisTS)(i1, i2, self);
+    }
+}
+
 /// Create a Variable type with a tuple of the provided types (`Args`).
 template Variable(Args...) {
     import std.typecons : Tuple;
@@ -805,11 +809,7 @@ unittest {
 
     // act
     while (iter.changed) {
-        static auto helper(T0, T1, T2)(T0 k, T1 v1, T2 v2) {
-            return kvTuple(v1, v2);
-        }
-
-        variable.fromJoin!(helper)(variable, variable);
+        variable.fromJoin!((k, v1, v2) => kvTuple(v1, v2))(variable, variable);
     }
 
     auto result = variable.complete;
@@ -892,11 +892,7 @@ unittest {
 
     // act
     while (iter.changed) {
-        static auto helper(T0, T1, T2)(T0 k, T1 v1, T2 v2) {
-            return kvTuple(v1, v2);
-        }
-
-        variable.fromJoin!(helper)(variable, variable);
+        variable.fromJoin!((k, v1, v2) => kvTuple(v1, v2))(variable, variable);
     }
 
     // assert
