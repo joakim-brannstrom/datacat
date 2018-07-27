@@ -65,7 +65,7 @@ template fromJoin(Args...) if (Args.length == 1) {
  * pairs are symmetric, this should result in all pairs (x, y) for x and y in 0 .. 11.
  */
 @("shall join two variables to produce all pairs (x,y) in the provided range")
-unittest {
+@safe unittest {
     import std.algorithm : map;
     import std.range : iota;
 
@@ -130,7 +130,7 @@ template fromAntiJoin(Args...) if (Args.length == 1) {
  * pairs (for 0, 3, 6, and 9) which should leave us with 16 total pairs.
  */
 @("shall anti-join two variables to produce only those pairs that are not multiples of 3")
-unittest {
+@safe unittest {
     import std.algorithm : map, filter;
     import std.range : iota;
 

@@ -30,8 +30,6 @@ version (unittest) {
     import unit_threaded;
 }
 
-@safe:
-
 alias KVTuple(K, V) = Tuple!(K, "key", V, "value");
 alias KVTuple(K) = Tuple!(K, "key");
 
@@ -413,7 +411,7 @@ enum isTuple(T) = hasMember!(T, "key") && hasMember!(T, "value");
 /// A type that can report on whether it has changed.
 interface VariableTrait {
     /// Reports whether the variable has changed since it was last asked.
-    bool changed();
+    bool changed() @safe;
 }
 
 /// An monotonically increasing set of `Tuple`s.
@@ -542,7 +540,7 @@ final class Variable(TupleT, ThreadStrategy TS = ThreadStrategy.single) : Variab
         return result;
     }
 
-    override bool changed() {
+    override bool changed() @safe {
         import std.array : popBack, back, appender, empty;
 
         // 1. Merge self.recent into self.stable.
@@ -647,7 +645,7 @@ template Variable(Args...) {
 }
 
 @("shall complete a variable")
-unittest {
+@safe unittest {
     // arrange
     auto a = new Variable!(int, int);
     a.insert(relation!(int, int).from([[1, 10], [5, 51]]));
@@ -662,7 +660,7 @@ unittest {
 }
 
 @("shall progress a variable by moving newly added to the recent state")
-unittest {
+@safe unittest {
     import std.array : empty;
 
     // arrange
@@ -682,7 +680,7 @@ unittest {
 }
 
 @("shall progress from toAdd to stable after two `changed`")
-unittest {
+@safe unittest {
     import std.array : empty;
 
     // arrange
@@ -700,7 +698,7 @@ unittest {
 }
 
 @("shall be chunks in stable that have a size about 2x of recent")
-unittest {
+@safe unittest {
     import std.algorithm : map, count;
     import std.range : iota;
 
@@ -720,7 +718,7 @@ unittest {
 }
 
 @("shall produce the same result between the fast and slow path when forcing distinct facts")
-unittest {
+@safe unittest {
     import std.algorithm : map, count;
     import std.range : iota;
 
@@ -749,7 +747,7 @@ unittest {
 }
 
 @("shall produce the same result between the single and multithreaded Iteration")
-unittest {
+@safe unittest {
     import std.algorithm : map, count;
     import std.range : iota;
 
@@ -779,7 +777,7 @@ unittest {
 }
 
 @("shall count the elements in the nested arrays in stable")
-unittest {
+@safe unittest {
     auto var = new Variable!(int, int);
     var.stable ~= relation!(int, int)([kvTuple(3, 2), kvTuple(4, 2)]);
     var.stable ~= relation!(int, int)([kvTuple(3, 2), kvTuple(4, 2)]);
