@@ -92,7 +92,7 @@ void loadData(T)(ref StopWatch timer, const string datafile, ref T nodes, ref T 
 
     // Read input data from a handy file.
     foreach (line; File(buildPath(datafile)).byLine.filter!(a => !a.empty && a[0] != '#')) {
-        auto elts = line.splitter.filter!"!a.empty".takeExactly(3);
+        auto elts = line.splitter;
         auto src = elts.myPopFront.to!uint;
         auto dst = elts.myPopFront.to!uint;
         auto ty = elts.myPopFront;
