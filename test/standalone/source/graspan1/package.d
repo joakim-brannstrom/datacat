@@ -15,8 +15,9 @@ Then execute the test with: dub test -- -s -d "shall calculate the dataflow from
 module datacat_test.graspan1;
 
 import std.algorithm : filter, map, splitter;
-import std.array : appender, empty, array;
+import std.array : empty;
 import std.ascii : isWhite;
+import std.container : Array;
 import std.conv : to;
 import std.datetime.stopwatch : StopWatch;
 import std.file : thisExePath;
@@ -46,8 +47,8 @@ int main(string[] args) {
     auto timer = StopWatch(Yes.autoStart);
 
     // Make space for input data.
-    auto nodes = appender!(KVTuple!(uint, uint)[])();
-    auto edges = appender!(KVTuple!(uint, uint)[])();
+    Array!(KVTuple!(uint, uint)) nodes;
+    Array!(KVTuple!(uint, uint)) edges;
 
     loadData(timer, datafile, nodes, edges);
 
@@ -62,14 +63,14 @@ int main(string[] args) {
             auto t = timer;
             t.start;
             Iteration iter;
-            calculate(t, iter, nodes, edges);
+            calculate(t, iter, nodes[], edges[]);
             break;
         case parallel:
             writeln("Multi threaded");
             auto t = timer;
             t.start;
             auto iter = makeIteration!(ThreadStrategy.parallel);
-            calculate(t, iter, nodes, edges);
+            calculate(t, iter, nodes[], edges[]);
             break;
         }
     }
@@ -98,10 +99,10 @@ void loadData(T)(ref StopWatch timer, const string datafile, ref T nodes, ref T 
         auto ty = elts.myPopFront;
         switch (ty) {
         case "n":
-            nodes.put(kvTuple(dst, src));
+            nodes ~= kvTuple(dst, src);
             break;
         case "e":
-            edges.put(kvTuple(src, dst));
+            edges ~= kvTuple(src, dst);
             break;
         default:
             assert(0, "should not happen. Unknown type: " ~ ty);
@@ -117,8 +118,8 @@ void calculate(IterT, T)(ref StopWatch timer, ref IterT iter, T nodes, T edges) 
     auto variable2 = iter.variable!(uint, uint)("edges");
 
     // .. load them with some initial values, ..
-    variable1.insert(nodes.data);
-    variable2.insert(edges.data);
+    variable1.insert(nodes);
+    variable2.insert(edges);
 
     writefln("elapsed(%s) partial(%s): Initial Variable.insert of data", timer.peek, partial.peek);
 
