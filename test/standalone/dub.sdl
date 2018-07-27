@@ -19,3 +19,7 @@ configuration "graspan1" {
     sourcePaths "source/graspan1"
     importPaths "source/graspan1"
 }
+
+buildType "utProf" {
+    buildOptions "debugInfo" "profile" "optimize" "inline" "releaseMode"
+}
