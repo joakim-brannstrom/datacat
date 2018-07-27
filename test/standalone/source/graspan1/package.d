@@ -43,12 +43,13 @@ int main(string[] args) {
     const datafile = args[1];
 
     writeln("Processing ", datafile);
+    auto timer = StopWatch(Yes.autoStart);
 
     // Make space for input data.
     auto nodes = appender!(KVTuple!(uint, uint)[])();
     auto edges = appender!(KVTuple!(uint, uint)[])();
 
-    loadData(datafile, nodes, edges);
+    loadData(timer, datafile, nodes, edges);
 
     void runTest(TestType test) {
         final switch (test) with (TestType) {
@@ -58,17 +59,22 @@ int main(string[] args) {
             break;
         case single:
             writeln("Single threaded");
+            auto t = timer;
+            t.start;
             Iteration iter;
-            calculate(iter, nodes, edges);
+            calculate(t, iter, nodes, edges);
             break;
         case parallel:
             writeln("Multi threaded");
+            auto t = timer;
+            t.start;
             auto iter = makeIteration!(ThreadStrategy.parallel);
-            calculate(iter, nodes, edges);
+            calculate(t, iter, nodes, edges);
             break;
         }
     }
 
+    timer.stop;
     runTest(test);
 
     return 0;
@@ -80,8 +86,7 @@ auto myPopFront(RT)(ref RT r) {
     return v;
 }
 
-void loadData(T)(const string datafile, ref T nodes, ref T edges) {
-    auto timer = StopWatch(Yes.autoStart);
+void loadData(T)(ref StopWatch timer, const string datafile, ref T nodes, ref T edges) {
     scope (exit)
         writefln("%s: Data loaded", timer.peek);
 
@@ -104,8 +109,8 @@ void loadData(T)(const string datafile, ref T nodes, ref T edges) {
     }
 }
 
-void calculate(IterT, T)(ref IterT iter, T nodes, T edges) {
-    auto timer = StopWatch(Yes.autoStart);
+void calculate(IterT, T)(ref StopWatch timer, ref IterT iter, T nodes, T edges) {
+    auto partial = StopWatch(Yes.autoStart);
 
     // .. some variables, ..
     auto variable1 = iter.variable!(uint, uint)("nodes");
@@ -114,6 +119,8 @@ void calculate(IterT, T)(ref IterT iter, T nodes, T edges) {
     // .. load them with some initial values, ..
     variable1.insert(nodes.data);
     variable2.insert(edges.data);
+
+    writefln("elapsed(%s) partial(%s): Initial Variable.insert of data", timer.peek, partial.peek);
 
     // .. and then start iterating rules!
     while (iter.changed) {
@@ -126,7 +133,10 @@ void calculate(IterT, T)(ref IterT iter, T nodes, T edges) {
     }
 
     auto reachable = variable1.complete;
-    writefln("%s: Computation complete (nodes_final: %s)", timer.peek, reachable.length);
+    timer.stop;
+    partial.stop;
+    writefln("elapsed(%s) partial(%s): Computation complete (nodes_final: %s)",
+            timer.peek, partial.peek, reachable.length);
 }
 
 int parseCli(ref string[] args, ref TestType test) {
