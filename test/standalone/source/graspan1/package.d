@@ -16,30 +16,74 @@ module datacat_test.graspan1;
 
 import std.algorithm : filter, map, splitter;
 import std.array : appender, empty, array;
+import std.ascii : isWhite;
 import std.conv : to;
 import std.datetime.stopwatch : StopWatch;
 import std.file : thisExePath;
+import std.format : format;
 import std.path : buildPath, baseName;
 import std.range : takeExactly;
 import std.stdio : writeln, writefln, File;
+import std.traits : EnumMembers;
 import std.typecons : Yes;
-import std.ascii : isWhite;
 
 import datacat;
 
-int main(string[] args) {
-    if (args.length < 2) {
-        writefln("Usage: %s DATA_FILE", thisExePath.baseName);
-        return 1;
-    }
-    writeln("Shall calculate the dataflow from the provided file");
+enum TestType {
+    all,
+    single,
+    parallel,
+}
 
-    auto timer = StopWatch(Yes.autoStart);
+int main(string[] args) {
+    TestType test;
+    if (auto ecode = parseCli(args, test))
+        return ecode;
+
     const datafile = args[1];
+
+    writeln("Processing ", datafile);
 
     // Make space for input data.
     auto nodes = appender!(KVTuple!(uint, uint)[])();
     auto edges = appender!(KVTuple!(uint, uint)[])();
+
+    loadData(datafile, nodes, edges);
+
+    void runTest(TestType test) {
+        final switch (test) with (TestType) {
+        case all:
+            runTest(TestType.single);
+            runTest(TestType.parallel);
+            break;
+        case single:
+            writeln("Single threaded");
+            Iteration iter;
+            calculate(iter, nodes, edges);
+            break;
+        case parallel:
+            writeln("Multi threaded");
+            auto iter = makeIteration!(ThreadStrategy.parallel);
+            calculate(iter, nodes, edges);
+            break;
+        }
+    }
+
+    runTest(test);
+
+    return 0;
+}
+
+auto myPopFront(RT)(ref RT r) {
+    auto v = r.front;
+    r.popFront;
+    return v;
+}
+
+void loadData(T)(const string datafile, ref T nodes, ref T edges) {
+    auto timer = StopWatch(Yes.autoStart);
+    scope (exit)
+        writefln("%s: Data loaded", timer.peek);
 
     // Read input data from a handy file.
     foreach (line; File(buildPath(datafile)).byLine.filter!(a => !a.empty && a[0] != '#')) {
@@ -58,52 +102,44 @@ int main(string[] args) {
             assert(0, "should not happen. Unknown type: " ~ ty);
         }
     }
+}
 
-    writefln("%s: Data loaded", timer.peek);
+void calculate(IterT, T)(ref IterT iter, T nodes, T edges) {
+    auto timer = StopWatch(Yes.autoStart);
 
-    // Create a new iteration context, ...
-    void run(T)(ref T iter) {
-        auto timer = StopWatch(Yes.autoStart);
-        // .. some variables, ..
-        auto variable1 = iter.variable!(uint, uint)("nodes");
-        auto variable2 = iter.variable!(uint, uint)("edges");
+    // .. some variables, ..
+    auto variable1 = iter.variable!(uint, uint)("nodes");
+    auto variable2 = iter.variable!(uint, uint)("edges");
 
-        // .. load them with some initial values, ..
-        variable1.insert(nodes.data);
-        variable2.insert(edges.data);
+    // .. load them with some initial values, ..
+    variable1.insert(nodes.data);
+    variable2.insert(edges.data);
 
-        // .. and then start iterating rules!
-        while (iter.changed) {
-            // N(a,c) <-  N(a,b), E(b,c)
-            static auto helper(T0, T1, T2)(T0 b, T1 a, T2 c) {
-                return kvTuple(c, a);
-            }
-
-            variable1.fromJoin!helper(variable1, variable2);
+    // .. and then start iterating rules!
+    while (iter.changed) {
+        // N(a,c) <-  N(a,b), E(b,c)
+        static auto helper(T0, T1, T2)(T0 b, T1 a, T2 c) {
+            return kvTuple(c, a);
         }
 
-        auto reachable = variable1.complete;
-
-        timer.stop;
-        writefln("%s: Computation complete (nodes_final: %s)", timer.peek, reachable.length);
+        variable1.fromJoin!helper(variable1, variable2);
     }
 
-    {
-        writeln("Single threaded");
-        Iteration iter;
-        run(iter);
-    }
-    {
-        writeln("Multi threaded");
-        auto iter = makeIteration!(ThreadStrategy.parallel);
-        run(iter);
+    auto reachable = variable1.complete;
+    writefln("%s: Computation complete (nodes_final: %s)", timer.peek, reachable.length);
+}
+
+int parseCli(ref string[] args, ref TestType test) {
+    import std.getopt;
+
+    auto help_info = getopt(args, config.passThrough, config.keepEndOfOptions, "test",
+            format("kind fo test to perform %s", [EnumMembers!TestType]), &test,);
+
+    if (help_info.helpWanted || args.length < 2) {
+        defaultGetoptPrinter(format("usage: %s [options] DATA_FILE\n",
+                args[0].baseName), help_info.options);
+        return 1;
     }
 
     return 0;
-}
-
-auto myPopFront(RT)(ref RT r) {
-    auto v = r.front;
-    r.popFront;
-    return v;
 }
