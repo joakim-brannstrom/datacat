@@ -53,7 +53,7 @@ template fromMap(Args...) if (Args.length == 1) {
  * pairs (x, y) where x visits y as part of its Collatz journey.
  */
 @("shall be the tuples that result from applying a function on the input")
-unittest {
+@safe unittest {
     import std.algorithm : map, filter;
     import std.range : iota;
     import datacat : Iteration, kvTuple;
