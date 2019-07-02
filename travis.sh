@@ -11,6 +11,7 @@ dub build -b release
 pushd standalone
 # test building the standalone apps
 dub build -c graspan1 -b release
+dub build -c example -b release
 popd
 
 popd
